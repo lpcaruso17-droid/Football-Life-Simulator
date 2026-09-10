@@ -1,326 +1,236 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Football Life Simulator</title>
-
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Football Life Simulator</title>
+  <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-
 <div id="app">
 
-    <!-- TELA INICIAL -->
-    <section id="homeScreen" class="screen active">
+  <!-- HOME -->
+  <section id="homeScreen" class="screen active">
+    <div class="hero">
+      <p class="eyebrow">UMA VIDA. MIL CAMINHOS.</p>
+      <h1>FOOTBALL <span>LIFE SIMULATOR</span></h1>
+      <p class="hero-text">
+        Comece aos 10 anos e descubra até onde o futebol pode levar a sua vida.
+      </p>
+      <div class="home-actions">
+        <button id="createCharacterButton" class="primary-button">CRIAR PERSONAGEM</button>
+        <button id="randomLifeButton" class="secondary-button">SORTEAR UMA VIDA</button>
+        <button id="continueButton" class="continue-button hidden">CONTINUAR VIDA</button>
+      </div>
+      <p class="version">ALPHA BUILD · V0.2</p>
+    </div>
+  </section>
 
-        <div class="hero">
+  <!-- CRIAÇÃO -->
+  <section id="creatorScreen" class="screen">
+    <div class="page-container">
+      <div class="topbar">
+        <button id="backButton" class="text-button">← VOLTAR</button>
+        <span>NOVA VIDA</span>
+      </div>
 
-            <p class="eyebrow">
-                UMA VIDA. MIL CAMINHOS.
-            </p>
+      <div class="creator-header">
+        <p class="eyebrow">SUA HISTÓRIA COMEÇA AQUI</p>
+        <h2>Crie seu personagem</h2>
+        <p>
+          Você começa aos 10 anos. Algumas escolhas serão suas.
+          Outras, a vida fará por você.
+        </p>
+      </div>
 
-            <h1>
-                FOOTBALL
-                <span>LIFE SIMULATOR</span>
-            </h1>
+      <form id="characterForm">
+        <div class="form-grid">
+          <label>
+            Nome completo
+            <input id="playerName" type="text" maxlength="40" placeholder="Ex: Gabriel Almeida" required>
+          </label>
 
-            <p class="hero-text">
-                Comece aos 10 anos e descubra até onde o futebol
-                pode levar a sua vida.
-            </p>
+          <label>
+            Cidade de origem
+            <select id="city"></select>
+          </label>
 
-            <div class="home-actions">
+          <label>
+            Situação financeira da família
+            <select id="financial"></select>
+          </label>
 
-                <button id="createCharacterButton" class="primary-button">
-                    CRIAR PERSONAGEM
-                </button>
+          <label>
+            Contexto familiar
+            <select id="family"></select>
+          </label>
 
-                <button id="randomLifeButton" class="secondary-button">
-                    SORTEAR UMA VIDA
-                </button>
+          <label>
+            Clube aos 10 anos
+            <select id="club"></select>
+          </label>
 
-                <button id="continueButton" class="continue-button hidden">
-                    CONTINUAR VIDA
-                </button>
+          <label>
+            Posição inicial
+            <select id="position"></select>
+          </label>
 
-            </div>
-
-            <p class="version">
-                ALPHA BUILD · V0.1
-            </p>
-
+          <label>
+            Pé dominante
+            <select id="foot"></select>
+          </label>
         </div>
 
-    </section>
+        <div class="creator-actions">
+          <button type="button" id="randomizeButton" class="secondary-button">🎲 SORTEAR TUDO</button>
+          <button type="submit" class="primary-button">COMEÇAR MINHA VIDA</button>
+        </div>
+      </form>
+    </div>
+  </section>
 
+  <!-- DASHBOARD -->
+  <section id="dashboardScreen" class="screen">
+    <div class="page-container">
 
-    <!-- CRIAÇÃO -->
-    <section id="creatorScreen" class="screen">
-
-        <div class="page-container">
-
-            <div class="topbar">
-
-                <button id="backButton" class="text-button">
-                    ← VOLTAR
-                </button>
-
-                <span>
-                    NOVA VIDA
-                </span>
-
-            </div>
-
-            <div class="creator-header">
-
-                <p class="eyebrow">
-                    SUA HISTÓRIA COMEÇA AQUI
-                </p>
-
-                <h2>Crie seu personagem</h2>
-
-                <p>
-                    Você começa aos 10 anos. Algumas escolhas serão suas.
-                    Outras, a vida fará por você.
-                </p>
-
-            </div>
-
-
-            <form id="characterForm">
-
-                <div class="form-grid">
-
-                    <label>
-                        Nome completo
-
-                        <input
-                            id="playerName"
-                            type="text"
-                            maxlength="40"
-                            placeholder="Ex: Gabriel Almeida"
-                            required
-                        >
-                    </label>
-
-
-                    <label>
-                        Cidade de origem
-
-                        <select id="city"></select>
-                    </label>
-
-
-                    <label>
-                        Situação financeira da família
-
-                        <select id="financial"></select>
-                    </label>
-
-
-                    <label>
-                        Contexto familiar
-
-                        <select id="family"></select>
-                    </label>
-
-
-                    <label>
-                        Clube aos 10 anos
-
-                        <select id="club"></select>
-                    </label>
-
-
-                    <label>
-                        Posição inicial
-
-                        <select id="position"></select>
-                    </label>
-
-
-                    <label>
-                        Pé dominante
-
-                        <select id="foot"></select>
-                    </label>
-
-                </div>
-
-
-                <div class="creator-actions">
-
-                    <button
-                        type="button"
-                        id="randomizeButton"
-                        class="secondary-button"
-                    >
-                        🎲 SORTEAR TUDO
-                    </button>
-
-                    <button
-                        type="submit"
-                        class="primary-button"
-                    >
-                        COMEÇAR MINHA VIDA
-                    </button>
-
-                </div>
-
-            </form>
-
+      <header class="game-header">
+        <div>
+          <p class="eyebrow">MINHA VIDA</p>
+          <h2 id="dashboardName"></h2>
+          <p id="dashboardInfo" class="muted"></p>
         </div>
 
-    </section>
-
-
-    <!-- DASHBOARD -->
-    <section id="dashboardScreen" class="screen">
-
-        <div class="page-container">
-
-            <header class="game-header">
-
-                <div>
-
-                    <p class="eyebrow">
-                        MINHA VIDA
-                    </p>
-
-                    <h2 id="dashboardName"></h2>
-
-                    <p id="dashboardInfo" class="muted"></p>
-
-                </div>
-
-                <div class="age-box">
-
-                    <span>IDADE</span>
-
-                    <strong id="dashboardAge">
-                        10
-                    </strong>
-
-                </div>
-
-            </header>
-
-
-            <div class="main-stats">
-
-                <article class="stat-card">
-                    <span>SAÚDE</span>
-                    <strong id="healthStat"></strong>
-                </article>
-
-                <article class="stat-card">
-                    <span>FELICIDADE</span>
-                    <strong id="happinessStat"></strong>
-                </article>
-
-                <article class="stat-card">
-                    <span>ESCOLA</span>
-                    <strong id="schoolStat"></strong>
-                </article>
-
-                <article class="stat-card">
-                    <span>FAMÍLIA</span>
-                    <strong id="familyStat"></strong>
-                </article>
-
-                <article class="stat-card">
-                    <span>REPUTAÇÃO</span>
-                    <strong id="reputationStat"></strong>
-                </article>
-
-                <article class="stat-card">
-                    <span>PATRIMÔNIO</span>
-                    <strong id="moneyStat"></strong>
-                </article>
-
-            </div>
-
-
-            <div class="career-card">
-
-                <p class="section-label">
-                    SITUAÇÃO ATUAL
-                </p>
-
-                <div class="career-grid">
-
-                    <div>
-                        <span>Clube</span>
-                        <strong id="clubInfo"></strong>
-                    </div>
-
-                    <div>
-                        <span>Posição</span>
-                        <strong id="positionInfo"></strong>
-                    </div>
-
-                    <div>
-                        <span>Pé dominante</span>
-                        <strong id="footInfo"></strong>
-                    </div>
-
-                    <div>
-                        <span>Ano</span>
-                        <strong id="yearInfo"></strong>
-                    </div>
-
-                </div>
-
-            </div>
-
-
-            <details class="attributes-panel">
-
-                <summary>
-                    VER ATRIBUTOS DO JOGADOR
-                </summary>
-
-                <div id="attributesContainer"></div>
-
-            </details>
-
-
-            <div class="story-card">
-
-                <p class="section-label">
-                    SUA HISTÓRIA
-                </p>
-
-                <h3>10 anos · O começo</h3>
-
-                <p id="openingStory"></p>
-
-            </div>
-
-
-            <div class="dashboard-actions">
-
-                <button id="nextYearButton" class="primary-button">
-                    AVANÇAR PARA OS 11 ANOS
-                </button>
-
-                <button id="resetGameButton" class="danger-button">
-                    APAGAR VIDA
-                </button>
-
-            </div>
-
+        <div class="age-box">
+          <span>IDADE</span>
+          <strong id="dashboardAge">10</strong>
         </div>
+      </header>
 
-    </section>
+      <div class="main-stats">
+        <article class="stat-card">
+          <span>SAÚDE</span>
+          <strong id="healthStat"></strong>
+        </article>
+
+        <article class="stat-card">
+          <span>FELICIDADE</span>
+          <strong id="happinessStat"></strong>
+        </article>
+
+        <article class="stat-card">
+          <span>ESCOLA</span>
+          <strong id="schoolStat"></strong>
+        </article>
+
+        <article class="stat-card">
+          <span>FAMÍLIA</span>
+          <strong id="familyStat"></strong>
+        </article>
+
+        <article class="stat-card">
+          <span>REPUTAÇÃO</span>
+          <strong id="reputationStat"></strong>
+        </article>
+
+        <article class="stat-card">
+          <span>PATRIMÔNIO</span>
+          <strong id="moneyStat"></strong>
+        </article>
+      </div>
+
+      <div class="career-card">
+        <p class="section-label">SITUAÇÃO ATUAL</p>
+        <div class="career-grid">
+          <div>
+            <span>Clube</span>
+            <strong id="clubInfo"></strong>
+          </div>
+          <div>
+            <span>Posição</span>
+            <strong id="positionInfo"></strong>
+          </div>
+          <div>
+            <span>Pé dominante</span>
+            <strong id="footInfo"></strong>
+          </div>
+          <div>
+            <span>Ano</span>
+            <strong id="yearInfo"></strong>
+          </div>
+        </div>
+      </div>
+
+      <details class="attributes-panel">
+        <summary>VER ATRIBUTOS DO JOGADOR</summary>
+        <div id="attributesContainer"></div>
+      </details>
+
+      <div class="story-card">
+        <p class="section-label">DIÁRIO DA VIDA</p>
+        <h3 id="storyTitle"></h3>
+        <p id="openingStory"></p>
+      </div>
+
+      <div class="dashboard-actions">
+        <button id="nextYearButton" class="primary-button"></button>
+        <button id="resetGameButton" class="danger-button">APAGAR VIDA</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- EVENTOS DO ANO -->
+  <section id="eventScreen" class="screen">
+    <div class="page-container event-page">
+      <div class="topbar">
+        <span id="eventYearLabel"></span>
+        <span id="eventProgress"></span>
+      </div>
+
+      <div class="event-shell">
+        <p id="eventCategory" class="eyebrow"></p>
+        <h2 id="eventTitle"></h2>
+        <p id="eventText" class="event-text"></p>
+
+        <div id="eventChoices" class="event-choices"></div>
+
+        <div id="eventResult" class="event-result hidden" aria-live="polite">
+          <p class="section-label">CONSEQUÊNCIA</p>
+          <p id="eventOutcome"></p>
+          <button id="continueEventButton" class="primary-button">CONTINUAR</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESUMO DO ANO -->
+  <section id="summaryScreen" class="screen">
+    <div class="page-container">
+      <div class="topbar">
+        <span>FIM DA TEMPORADA</span>
+        <span id="summaryYear"></span>
+      </div>
+
+      <div class="summary-header">
+        <p class="eyebrow">UM ANO DA SUA HISTÓRIA</p>
+        <h2 id="summaryTitle"></h2>
+        <p id="summarySubtitle" class="muted"></p>
+      </div>
+
+      <div id="seasonStats" class="season-stats"></div>
+
+      <div class="story-card">
+        <p class="section-label">BALANÇO DO ANO</p>
+        <div id="yearHighlights" class="timeline-list"></div>
+      </div>
+
+      <div class="summary-actions">
+        <button id="finishYearButton" class="primary-button"></button>
+      </div>
+    </div>
+  </section>
 
 </div>
 
-
 <script src="script.js"></script>
-
 </body>
 </html>
