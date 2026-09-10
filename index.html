@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Football Life Simulator</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            font-family: Arial, Helvetica, sans-serif;
+            background:
+                radial-gradient(circle at top, #20252b 0%, #101214 40%, #070809 100%);
+            color: #ffffff;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .game-start {
+            width: 90%;
+            max-width: 800px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            font-size: 13px;
+            margin-bottom: 18px;
+        }
+
+        h1 {
+            font-size: clamp(42px, 8vw, 82px);
+            line-height: 0.95;
+            margin-bottom: 18px;
+        }
+
+        h1 span {
+            display: block;
+            color: #aaa;
+            font-size: 0.48em;
+            margin-top: 12px;
+        }
+
+        .description {
+            color: #bbb;
+            max-width: 600px;
+            margin: 0 auto 40px;
+            line-height: 1.7;
+            font-size: 17px;
+        }
+
+        button {
+            background: #ffffff;
+            color: #080808;
+            border: none;
+            padding: 17px 35px;
+            border-radius: 8px;
+
+            font-size: 16px;
+            font-weight: bold;
+
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            background: #dddddd;
+        }
+
+        .version {
+            margin-top: 25px;
+            color: #555;
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <main class="game-start">
+
+        <div class="subtitle">
+            Sua história começa aos 10 anos
+        </div>
+
+        <h1>
+            FOOTBALL
+            <span>LIFE SIMULATOR</span>
+        </h1>
+
+        <p class="description">
+            Talento não garante sucesso.
+            Escolhas, família, oportunidades, lesões,
+            relacionamentos e sorte definirão a sua história
+            dentro e fora do futebol.
+        </p>
+
+        <button id="startButton">
+            COMEÇAR NOVA VIDA
+        </button>
+
+        <div class="version">
+            DEVELOPMENT BUILD — V0.1
+        </div>
+
+    </main>
+
+    <script>
+        const startButton = document.getElementById("startButton");
+
+        startButton.addEventListener("click", function () {
+            alert("Em breve: criação do personagem.");
+        });
+    </script>
+
+</body>
+</html>
