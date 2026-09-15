@@ -22,7 +22,7 @@
         <button id="randomLifeButton" class="secondary-button">SORTEAR UMA VIDA</button>
         <button id="continueButton" class="continue-button hidden">CONTINUAR VIDA</button>
       </div>
-      <p class="version">ALPHA BUILD · V0.2</p>
+      <p class="version">ALPHA BUILD · V0.3</p>
     </div>
   </section>
 
@@ -160,9 +160,37 @@
         </div>
       </div>
 
+      <div class="football-card">
+        <p class="section-label">MOMENTO NO FUTEBOL</p>
+        <div class="football-grid">
+          <div>
+            <span>Status no elenco</span>
+            <strong id="footballStatus"></strong>
+          </div>
+          <div>
+            <span>Confiança do treinador</span>
+            <strong id="coachConfidence"></strong>
+          </div>
+          <div>
+            <span>Forma</span>
+            <strong id="currentForm"></strong>
+          </div>
+          <div>
+            <span>Concorrência na posição</span>
+            <strong id="competitionInfo"></strong>
+          </div>
+        </div>
+        <p id="footballSummaryText" class="football-summary"></p>
+      </div>
+
       <details class="attributes-panel">
         <summary>VER ATRIBUTOS DO JOGADOR</summary>
         <div id="attributesContainer"></div>
+      </details>
+
+      <details class="attributes-panel">
+        <summary>HISTÓRICO DE CLUBES E TEMPORADAS</summary>
+        <div id="careerHistoryContainer" class="career-history"></div>
       </details>
 
       <div class="story-card">
@@ -217,6 +245,25 @@
       </div>
 
       <div id="seasonStats" class="season-stats"></div>
+
+      <div class="football-card summary-football-card">
+        <p class="section-label">AVALIAÇÃO DA TEMPORADA</p>
+        <h3 id="seasonEvaluationTitle"></h3>
+        <p id="seasonEvaluationText" class="football-summary"></p>
+      </div>
+
+      <div class="football-card">
+        <p class="section-label">ÚLTIMOS JOGOS</p>
+        <div id="recentMatches" class="match-list"></div>
+      </div>
+
+      <div id="marketCard" class="market-card hidden">
+        <p class="section-label">MERCADO E FUTURO</p>
+        <h3 id="marketTitle"></h3>
+        <p id="marketText"></p>
+        <div id="marketChoices" class="event-choices"></div>
+        <div id="marketResult" class="market-result hidden" aria-live="polite"></div>
+      </div>
 
       <div class="story-card">
         <p class="section-label">BALANÇO DO ANO</p>

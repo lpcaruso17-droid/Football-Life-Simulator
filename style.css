@@ -560,3 +560,171 @@ select:focus {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* V0.3 — MOTOR DE FUTEBOL */
+
+.football-card,
+.market-card {
+  margin-top: 18px;
+  padding: 26px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.football-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.football-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 7px;
+}
+
+.football-grid strong {
+  font-size: 17px;
+}
+
+.football-summary {
+  color: var(--muted);
+  line-height: 1.7;
+  margin-top: 22px;
+}
+
+.career-history {
+  margin-top: 22px;
+}
+
+.career-history-item {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.career-history-item:last-child {
+  border-bottom: 0;
+}
+
+.career-history-item .career-year {
+  color: var(--accent);
+  font-weight: 900;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.career-history-item strong {
+  display: block;
+  margin-bottom: 5px;
+}
+
+.career-history-item p {
+  color: var(--muted);
+  line-height: 1.55;
+  font-size: 13px;
+}
+
+.summary-football-card h3,
+.market-card h3 {
+  font-size: 24px;
+  margin-bottom: 10px;
+}
+
+.match-list {
+  display: grid;
+  gap: 10px;
+}
+
+.match-row {
+  display: grid;
+  grid-template-columns: minmax(170px, 1.4fr) 80px 90px 90px minmax(130px, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.match-row:last-child {
+  border-bottom: none;
+}
+
+.match-opponent {
+  font-weight: 800;
+}
+
+.match-score {
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.match-meta,
+.match-extra {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.market-card > p:not(.section-label) {
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.market-result {
+  margin-top: 20px;
+  color: var(--muted);
+  line-height: 1.7;
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel-light);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+@media (max-width: 850px) {
+  .football-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .match-row {
+    grid-template-columns: 1fr 70px 75px;
+  }
+
+  .match-row .match-meta:last-of-type,
+  .match-row .match-extra {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 600px) {
+  .football-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .career-history-item {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .match-row {
+    grid-template-columns: 1fr 70px;
+  }
+
+  .match-row .match-meta,
+  .match-row .match-extra {
+    grid-column: 1 / -1;
+  }
+}

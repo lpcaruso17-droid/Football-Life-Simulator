@@ -262,16 +262,17 @@ function randomizeCharacter() {
 function createLife() {
   const position = document.getElementById("position").value;
   const currentYear = new Date().getFullYear();
+  const club = document.getElementById("club").value;
 
   const character = {
-    version: 2,
+    version: 3,
     name: document.getElementById("playerName").value.trim(),
     age: 10,
     year: currentYear,
     city: document.getElementById("city").value,
     financial: document.getElementById("financial").value,
     family: document.getElementById("family").value,
-    club: document.getElementById("club").value,
+    club,
     position,
     foot: document.getElementById("foot").value,
 
@@ -282,7 +283,8 @@ function createLife() {
       ambition: randomNumber(35, 95),
       resilience: randomNumber(30, 95),
       professionalism: randomNumber(25, 90),
-      sociability: randomNumber(30, 90)
+      sociability: randomNumber(30, 90),
+      adaptability: randomNumber(30, 90)
     },
 
     life: {
@@ -299,8 +301,27 @@ function createLife() {
       teammates: randomNumber(50, 75)
     },
 
-    attributes: createAttributes(position),
+    football: {
+      squadStatus: "Em avaliação",
+      form: "Sem avaliação",
+      positionCompetition: randomNumber(2, 4)
+    },
 
+    career: {
+      clubs: [
+        {
+          club,
+          fromAge: 10,
+          fromYear: currentYear,
+          toAge: null,
+          toYear: null,
+          reason: "Início da trajetória"
+        }
+      ],
+      moves: []
+    },
+
+    attributes: createAttributes(position),
     seasons: [],
 
     history: [
@@ -309,7 +330,7 @@ function createLife() {
         year: currentYear,
         category: "Vida",
         title: "O começo",
-        description: `Começou sua jornada no futebol pelo ${document.getElementById("club").value}.`
+        description: `Começou sua jornada no futebol pelo ${club}.`
       }
     ],
 
@@ -323,10 +344,12 @@ function createLife() {
 function migrateSave(character) {
   if (!character) return null;
 
-  character.version = 2;
+  character.version = 3;
   character.personality ||= {};
   character.life ||= {};
   character.relations ||= {};
+  character.football ||= {};
+  character.career ||= {};
   character.seasons ||= [];
   character.history ||= [];
   character.pendingYear ||= null;
@@ -336,7 +359,8 @@ function migrateSave(character) {
     ambition: 55,
     resilience: 55,
     professionalism: 50,
-    sociability: 55
+    sociability: 55,
+    adaptability: 55
   };
 
   Object.entries(personalityDefaults).forEach(([key, value]) => {
@@ -361,6 +385,38 @@ function migrateSave(character) {
 
   if (!character.attributes || (character.position === "Goleiro" && !character.attributes.goalkeeper)) {
     character.attributes = createAttributes(character.position);
+  }
+
+  const latestSeason = character.seasons[character.seasons.length - 1];
+  if (character.football.squadStatus === undefined) {
+    character.football.squadStatus = latestSeason?.squadStatus || "Em avaliação";
+  }
+  if (character.football.form === undefined) {
+    character.football.form = latestSeason?.form || (latestSeason?.rating ? formLabel(latestSeason.rating) : "Sem avaliação");
+  }
+  if (character.football.positionCompetition === undefined) {
+    character.football.positionCompetition = randomNumber(2, 4);
+  }
+
+  if (!Array.isArray(character.career.clubs) || !character.career.clubs.length) {
+    character.career.clubs = [
+      {
+        club: character.club,
+        fromAge: 10,
+        fromYear: Math.max(new Date().getFullYear(), character.year) - Math.max(0, character.age - 10),
+        toAge: null,
+        toYear: null,
+        reason: "Início da trajetória"
+      }
+    ];
+  }
+
+  if (!Array.isArray(character.career.moves)) character.career.moves = [];
+
+  character.seasons.forEach(season => normalizeSeason(season));
+  if (character.pendingYear?.season) normalizeSeason(character.pendingYear.season);
+  if (character.pendingYear && character.pendingYear.marketOutcome === undefined) {
+    character.pendingYear.marketOutcome = null;
   }
 
   saveCharacter(character);
@@ -418,6 +474,101 @@ function latestHistoryItem(character) {
   return character.history[character.history.length - 1];
 }
 
+function confidenceLabel(value) {
+  if (value >= 82) return "Muito alta";
+  if (value >= 68) return "Boa";
+  if (value >= 52) return "Regular";
+  if (value >= 38) return "Instável";
+  return "Baixa";
+}
+
+function formLabel(rating) {
+  if (!rating) return "Sem avaliação";
+  if (rating >= 7.6) return "Excelente";
+  if (rating >= 7.1) return "Boa";
+  if (rating >= 6.5) return "Regular";
+  return "Ruim";
+}
+
+function normalizeSeason(season) {
+  if (!season) return season;
+  season.matches ??= season.appearances || 0;
+  season.appearances ??= season.matches || 0;
+  season.starts ??= 0;
+  season.minutes ??= Math.round((season.starts || 0) * 70 + Math.max(0, (season.appearances || 0) - (season.starts || 0)) * 22);
+  season.rating ??= 6.5;
+  season.squadStatus ??= squadStatusFromSeason(season);
+  season.form ??= formLabel(season.rating);
+  season.yellowCards ??= 0;
+  season.redCards ??= 0;
+  season.recentMatches ||= [];
+  if (season.position === "Goleiro") {
+    season.cleanSheets ??= 0;
+    season.goalsConceded ??= 0;
+    season.saves ??= Math.max(0, Math.round((season.appearances || 0) * 3.2));
+  } else {
+    season.goals ??= 0;
+    season.assists ??= 0;
+  }
+  return season;
+}
+
+function squadStatusFromSeason(season) {
+  const matches = Math.max(1, season.matches || 1);
+  const appearances = season.appearances || 0;
+  const starts = season.starts || 0;
+  const rating = season.rating || 0;
+
+  if (appearances / matches < 0.18) return "Fora dos planos";
+  if (appearances / matches < 0.45) return "Reserva";
+  if (starts / matches < 0.52) return "Rotação";
+  if (rating >= 7.45 && starts / matches >= 0.60) return "Destaque";
+  return "Titular";
+}
+
+function currentFootballSummary(character) {
+  const last = character.seasons[character.seasons.length - 1];
+  if (!last) {
+    return `Você ainda está no início da trajetória pelo ${character.club}. O treinador observa seus treinos enquanto você disputa espaço com outros jogadores da posição.`;
+  }
+
+  const base = `Na última temporada, você fez ${last.appearances} aparições, começou ${last.starts} como titular e teve média ${Number(last.rating).toFixed(1)}.`;
+  if (character.position === "Goleiro") {
+    return `${base} Foram ${last.cleanSheets || 0} jogos sem sofrer gols e ${last.saves || 0} defesas registradas.`;
+  }
+  return `${base} Você terminou com ${last.goals || 0} gols e ${last.assists || 0} assistências.`;
+}
+
+function renderCareerHistory(character) {
+  const container = document.getElementById("careerHistoryContainer");
+  if (!container) return;
+
+  if (!character.seasons.length) {
+    container.innerHTML = `<div class="timeline-item">Sua primeira temporada ainda será disputada.</div>`;
+    return;
+  }
+
+  container.innerHTML = [...character.seasons]
+    .reverse()
+    .map(season => {
+      normalizeSeason(season);
+      const production = season.position === "Goleiro"
+        ? `${season.cleanSheets || 0} jogos sem sofrer gols · ${season.saves || 0} defesas`
+        : `${season.goals || 0} gols · ${season.assists || 0} assistências`;
+
+      return `
+        <div class="career-history-item">
+          <div class="career-year">${season.year}<br>${season.age} ANOS</div>
+          <div>
+            <strong>${season.club} · ${season.squadStatus}</strong>
+            <p>${season.appearances} jogos · ${season.minutes} min · média ${Number(season.rating).toFixed(1)} · ${production}</p>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
 function renderDashboard(character) {
   document.getElementById("dashboardName").textContent = character.name;
   document.getElementById("dashboardInfo").textContent = `${character.city} · ${character.club}`;
@@ -440,6 +591,17 @@ function renderDashboard(character) {
   document.getElementById("footInfo").textContent = character.foot;
   document.getElementById("yearInfo").textContent = character.year;
 
+  const latestSeason = character.seasons[character.seasons.length - 1];
+  if (latestSeason) normalizeSeason(latestSeason);
+
+  document.getElementById("footballStatus").textContent =
+    character.club === "Sem clube" ? "Sem clube" : (latestSeason?.squadStatus || character.football.squadStatus || "Em avaliação");
+  document.getElementById("coachConfidence").textContent = confidenceLabel(character.relations.coach);
+  document.getElementById("currentForm").textContent = latestSeason?.form || character.football.form || "Sem avaliação";
+  document.getElementById("competitionInfo").textContent =
+    `${character.football.positionCompetition} concorrente${character.football.positionCompetition === 1 ? "" : "s"}`;
+  document.getElementById("footballSummaryText").textContent = currentFootballSummary(character);
+
   const latest = latestHistoryItem(character);
   document.getElementById("storyTitle").textContent =
     latest ? `${latest.age} anos · ${latest.title}` : `${character.age} anos`;
@@ -453,6 +615,8 @@ function renderDashboard(character) {
   attributesContainer.innerHTML = Object.entries(character.attributes)
     .map(([key, attrs]) => renderAttributeSection(attributeTitle(key), attrs))
     .join("");
+
+  renderCareerHistory(character);
 
   document.getElementById("nextYearButton").textContent =
     `VIVER O ANO DOS ${character.age} ANOS`;
@@ -733,8 +897,24 @@ const eventTemplates = [
         hint: "A mudança não será definitiva ainda.",
         outcome: "Você passa algumas semanas treinando em uma nova função e amplia sua compreensão do jogo.",
         effects: { "relations.coach": 4, "personality.adaptability": 3 },
-        action: c => improveRandomAttributes(c, "mental", 2, 3),
-        history: "Aceitou experimentar uma nova posição sugerida pelo treinador."
+        action: c => {
+          const alternatives = {
+            "Lateral Direito": ["Ponta Direita", "Volante"],
+            "Lateral Esquerdo": ["Ponta Esquerda", "Volante"],
+            "Zagueiro": ["Volante", "Lateral Direito", "Lateral Esquerdo"],
+            "Volante": ["Zagueiro", "Meia"],
+            "Meia": ["Volante", "Ponta Direita", "Ponta Esquerda"],
+            "Ponta Direita": ["Meia", "Lateral Direito", "Centroavante"],
+            "Ponta Esquerda": ["Meia", "Lateral Esquerdo", "Centroavante"],
+            "Centroavante": ["Ponta Direita", "Ponta Esquerda", "Meia"]
+          };
+          const nextPosition = randomItem(alternatives[c.position] || ["Meia"]);
+          const oldPosition = c.position;
+          c.position = nextPosition;
+          improveRandomAttributes(c, "mental", 2, 3);
+          addHistory(c, "Mudança de posição", `Passou de ${oldPosition} para ${nextPosition} após uma sugestão do treinador.`, "Futebol");
+        },
+        history: "Aceitou uma mudança de posição sugerida pelo treinador."
       },
       {
         label: "Pedir para continuar onde está",
@@ -1033,7 +1213,8 @@ function startYear(character) {
       chosenHistory: [],
       currentResolved: false,
       currentOutcome: "",
-      season: null
+      season: null,
+      marketOutcome: null
     };
 
     saveCharacter(character);
@@ -1144,16 +1325,19 @@ function overallFootballLevel(character) {
   return average(allValues);
 }
 
-function growPlayer(character) {
+function growPlayer(character, season = null) {
   const potentialGap = Math.max(0, character.hiddenPotential - overallFootballLevel(character));
   const disciplineFactor = character.personality.discipline / 100;
   const professionalFactor = character.personality.professionalism / 100;
+  const minutesFactor = season ? clamp(season.minutes / 1400, 0, 1) : 0.4;
+  const ratingFactor = season ? clamp((season.rating - 6) / 2, 0, 1) : 0.4;
 
   let growthPoints = 2;
-
   if (potentialGap > 35) growthPoints += 2;
   if (disciplineFactor > 0.65) growthPoints += 1;
   if (professionalFactor > 0.65) growthPoints += 1;
+  if (minutesFactor > 0.65) growthPoints += 1;
+  if (ratingFactor > 0.60) growthPoints += 1;
 
   const groupKeys = Object.keys(character.attributes);
 
@@ -1163,36 +1347,276 @@ function growPlayer(character) {
   }
 }
 
+function positionProfile(position) {
+  const profiles = {
+    "Goleiro": { goal: 0, assist: 0.01, yellow: 0.02 },
+    "Lateral Direito": { goal: 0.04, assist: 0.12, yellow: 0.10 },
+    "Lateral Esquerdo": { goal: 0.04, assist: 0.12, yellow: 0.10 },
+    "Zagueiro": { goal: 0.04, assist: 0.03, yellow: 0.14 },
+    "Volante": { goal: 0.07, assist: 0.09, yellow: 0.16 },
+    "Meia": { goal: 0.16, assist: 0.24, yellow: 0.07 },
+    "Ponta Direita": { goal: 0.22, assist: 0.18, yellow: 0.05 },
+    "Ponta Esquerda": { goal: 0.22, assist: 0.18, yellow: 0.05 },
+    "Centroavante": { goal: 0.34, assist: 0.10, yellow: 0.06 }
+  };
+  return profiles[position] || profiles["Meia"];
+}
+
+function randomOpponent(character) {
+  const available = clubs.filter(club => club !== character.club && !["Escolinha local", "Clube pequeno da cidade"].includes(club));
+  return randomItem(available.length ? available : clubs.filter(club => club !== character.club));
+}
+
+function simulateScore(character, appeared) {
+  const overall = overallFootballLevel(character);
+  const ownEdge = appeared ? clamp((overall - 35) / 45, -0.2, 0.65) : 0;
+  const ownGoals = clamp(randomNumber(0, 3) + (Math.random() < ownEdge ? 1 : 0), 0, 5);
+  const opponentGoals = randomNumber(0, 3);
+  return { ownGoals, opponentGoals };
+}
+
+function simulateMatch(character, startProbability, subProbability) {
+  const started = Math.random() < startProbability;
+  const appeared = started || Math.random() < subProbability;
+  const opponent = randomOpponent(character);
+  const score = simulateScore(character, appeared);
+
+  if (!appeared) {
+    return {
+      opponent,
+      ownGoals: score.ownGoals,
+      opponentGoals: score.opponentGoals,
+      appeared: false,
+      started: false,
+      minutes: 0,
+      rating: null,
+      goals: 0,
+      assists: 0,
+      saves: 0,
+      conceded: 0,
+      yellow: 0,
+      red: 0
+    };
+  }
+
+  const minutes = started ? randomNumber(58, 90) : randomNumber(8, 34);
+  const profile = positionProfile(character.position);
+  const overall = overallFootballLevel(character);
+  const performanceBoost = clamp((overall - 35) / 30, -0.2, 0.8);
+
+  let goals = 0;
+  let assists = 0;
+  let saves = 0;
+  let conceded = 0;
+
+  if (character.position === "Goleiro") {
+    conceded = Math.max(0, Math.round(score.opponentGoals * (minutes / 90)));
+    saves = randomNumber(1, 6) + (Math.random() < 0.35 + performanceBoost * 0.2 ? randomNumber(1, 3) : 0);
+  } else {
+    if (Math.random() < profile.goal * (0.75 + overall / 100)) goals += 1;
+    if (Math.random() < profile.goal * 0.18 && minutes > 65) goals += 1;
+    if (Math.random() < profile.assist * (0.75 + overall / 110)) assists += 1;
+  }
+
+  const yellow = Math.random() < profile.yellow ? 1 : 0;
+  const red = yellow && Math.random() < 0.025 ? 1 : 0;
+
+  let rating = 6.1 + randomNumber(-5, 6) / 10 + performanceBoost * 0.55;
+  if (goals) rating += goals * 0.65;
+  if (assists) rating += assists * 0.40;
+  if (character.position === "Goleiro") {
+    rating += saves * 0.06;
+    rating -= conceded * 0.18;
+    if (conceded === 0 && minutes >= 70) rating += 0.35;
+  }
+  if (score.ownGoals > score.opponentGoals) rating += 0.12;
+  if (red) rating -= 0.8;
+
+  rating = Math.round(clamp(rating, 5.1, 9.5) * 10) / 10;
+
+  return {
+    opponent,
+    ownGoals: score.ownGoals,
+    opponentGoals: score.opponentGoals,
+    appeared,
+    started,
+    minutes,
+    rating,
+    goals,
+    assists,
+    saves,
+    conceded,
+    yellow,
+    red
+  };
+}
+
+function buildSeasonEvaluation(character, season) {
+  const first = character.name.split(" ")[0];
+  if (season.squadStatus === "Destaque") {
+    return {
+      title: "Você virou referência da categoria",
+      text: `${first} terminou o ano como um dos nomes mais importantes do ${season.club}. A boa fase aumentou sua reputação e chamou atenção dentro do ambiente da base.`
+    };
+  }
+  if (season.squadStatus === "Titular") {
+    return {
+      title: "Ano de afirmação",
+      text: `${first} conquistou espaço entre os titulares e terminou a temporada com confiança do treinador. O desafio agora é transformar regularidade em evolução.`
+    };
+  }
+  if (season.squadStatus === "Rotação") {
+    return {
+      title: "Você segue disputando espaço",
+      text: `A temporada teve oportunidades e períodos no banco. ${first} continua dentro da rotação, mas ainda precisa convencer a comissão para se firmar como titular.`
+    };
+  }
+  if (season.squadStatus === "Reserva") {
+    return {
+      title: "Pouco espaço durante o ano",
+      text: `${first} participou menos do que gostaria. A concorrência está forte e a próxima temporada pode ser importante para definir sua continuidade e seu espaço no elenco.`
+    };
+  }
+  return {
+    title: "Um ano de alerta",
+    text: `${first} quase não foi utilizado e terminou o ano distante dos planos principais da comissão. Isso não encerra sua história, mas aumenta a chance de mudanças no caminho.`
+  };
+}
+
+function buildMarketOutcome(character, season) {
+  if (character.club === "Sem clube") {
+    return {
+      type: "tryout",
+      club: randomOpponent(character),
+      resolved: false,
+      decision: null,
+      resultText: ""
+    };
+  }
+
+  const strongSeason = season.rating >= 7.25 && season.appearances >= Math.max(7, Math.round(season.matches * 0.45));
+  const scoutChance = clamp(0.08 + Math.max(0, season.rating - 7) * 0.16 + character.life.reputation * 0.01, 0.08, 0.42);
+
+  if (character.age >= 11 && strongSeason && Math.random() < scoutChance) {
+    return {
+      type: character.age <= 12 ? "trial" : "interest",
+      club: randomOpponent(character),
+      resolved: false,
+      decision: null,
+      resultText: ""
+    };
+  }
+
+  const releaseRisk = character.age >= 12 &&
+    ["Fora dos planos", "Reserva"].includes(season.squadStatus) &&
+    character.relations.coach < 46;
+
+  if (releaseRisk && Math.random() < 0.42) {
+    return {
+      type: "release",
+      club: randomOpponent(character),
+      resolved: false,
+      decision: null,
+      resultText: ""
+    };
+  }
+
+  return null;
+}
+
+function changeClub(character, newClub, reason) {
+  if (!newClub || newClub === character.club) return;
+  const oldClub = character.club;
+  const currentEntry = [...character.career.clubs].reverse().find(item => item.toYear === null);
+  if (currentEntry) {
+    currentEntry.toAge = character.age;
+    currentEntry.toYear = character.year;
+  }
+
+  character.career.moves.push({
+    age: character.age,
+    year: character.year,
+    from: oldClub,
+    to: newClub,
+    reason
+  });
+
+  character.club = newClub;
+  character.career.clubs.push({
+    club: newClub,
+    fromAge: character.age,
+    fromYear: character.year,
+    toAge: null,
+    toYear: null,
+    reason
+  });
+
+  character.relations.coach = randomNumber(48, 65);
+  character.football.squadStatus = "Em avaliação";
+  character.football.form = "Sem avaliação";
+  character.football.positionCompetition = randomNumber(2, 5);
+
+  addHistory(character, "Mudança de clube", `Saiu do ${oldClub} e passou a fazer parte do ${newClub}. Motivo: ${reason}.`, "Futebol");
+}
+
 function simulateSeason(character) {
+  if (character.club === "Sem clube") {
+    const season = {
+      age: character.age,
+      year: character.year,
+      club: "Sem clube",
+      position: character.position,
+      matches: 0,
+      appearances: 0,
+      starts: 0,
+      minutes: 0,
+      rating: 0,
+      squadStatus: "Sem clube",
+      form: "Sem avaliação",
+      yellowCards: 0,
+      redCards: 0,
+      goals: 0,
+      assists: 0,
+      cleanSheets: 0,
+      goalsConceded: 0,
+      saves: 0,
+      recentMatches: [],
+      evaluation: {
+        title: "Um ano fora de um elenco",
+        text: "Sem clube, sua prioridade passa a ser manter a preparação e encontrar uma nova oportunidade para continuar no futebol organizado."
+      }
+    };
+    character.seasons.push(season);
+    character.pendingYear.season = season;
+    character.pendingYear.marketOutcome = buildMarketOutcome(character, season);
+    saveCharacter(character);
+    return season;
+  }
+
   const overall = overallFootballLevel(character);
   const coach = character.relations.coach;
   const discipline = character.personality.discipline;
+  const professionalism = character.personality.professionalism;
   const health = character.life.health;
+  const competition = character.football.positionCompetition;
 
-  const matches = randomNumber(14, 24);
+  const matches = randomNumber(18, 28);
+  let startProbability = 0.24 + (overall - 30) / 100 + (coach - 50) / 190 + (discipline - 50) / 360 - (competition - 2) * 0.025;
+  if (health < 75) startProbability -= 0.08;
+  startProbability = clamp(startProbability, 0.08, 0.82);
 
-  let startChance =
-    0.30 +
-    (overall - 30) / 100 +
-    (coach - 50) / 220 +
-    (discipline - 50) / 300;
+  let subProbability = clamp(0.34 + (professionalism - 50) / 280 + (coach - 50) / 300, 0.18, 0.62);
 
-  startChance = clamp(startChance, 0.20, 0.88);
+  const matchLog = [];
+  for (let i = 0; i < matches; i += 1) {
+    matchLog.push(simulateMatch(character, startProbability, subProbability));
+  }
 
-  const starts = Math.min(matches, Math.round(matches * startChance));
-  const subApps = Math.max(0, randomNumber(0, Math.max(1, matches - starts)));
-  const appearances = Math.min(matches, starts + subApps);
-
-  let rating =
-    5.8 +
-    (overall - 30) / 25 +
-    (coach - 50) / 90 +
-    randomNumber(-4, 6) / 10;
-
-  if (health < 75) rating -= 0.25;
-
-  rating = clamp(rating, 5.5, 8.8);
-  rating = Math.round(rating * 10) / 10;
+  const played = matchLog.filter(match => match.appeared);
+  const starts = played.filter(match => match.started).length;
+  const minutes = played.reduce((sum, match) => sum + match.minutes, 0);
+  const ratings = played.filter(match => match.rating !== null).map(match => match.rating);
+  const rating = ratings.length ? Math.round(average(ratings) * 10) / 10 : 5.8;
 
   const season = {
     age: character.age,
@@ -1200,52 +1624,59 @@ function simulateSeason(character) {
     club: character.club,
     position: character.position,
     matches,
-    appearances,
+    appearances: played.length,
     starts,
-    rating
+    minutes,
+    rating,
+    yellowCards: played.reduce((sum, match) => sum + match.yellow, 0),
+    redCards: played.reduce((sum, match) => sum + match.red, 0),
+    recentMatches: matchLog.slice(-5)
   };
 
   if (character.position === "Goleiro") {
-    const cleanSheetRate = clamp(0.15 + (overall - 30) / 120, 0.12, 0.55);
-    season.cleanSheets = Math.min(appearances, Math.round(appearances * cleanSheetRate));
-    season.goalsConceded = Math.max(0, Math.round(appearances * clamp(1.7 - overall / 70, 0.5, 1.7)));
+    season.cleanSheets = played.filter(match => match.conceded === 0 && match.minutes >= 60).length;
+    season.goalsConceded = played.reduce((sum, match) => sum + match.conceded, 0);
+    season.saves = played.reduce((sum, match) => sum + match.saves, 0);
   } else {
-    const attackingPositions = ["Ponta Direita", "Ponta Esquerda", "Centroavante", "Meia"];
-    const midfieldPositions = ["Volante", "Lateral Direito", "Lateral Esquerdo"];
-
-    let goalRate = 0.04;
-    let assistRate = 0.05;
-
-    if (attackingPositions.includes(character.position)) {
-      goalRate = character.position === "Centroavante" ? 0.36 : 0.22;
-      assistRate = character.position === "Meia" ? 0.28 : 0.18;
-    } else if (midfieldPositions.includes(character.position)) {
-      goalRate = 0.08;
-      assistRate = 0.14;
-    }
-
-    season.goals = Math.max(0, Math.round(appearances * goalRate * (0.75 + overall / 120)));
-    season.assists = Math.max(0, Math.round(appearances * assistRate * (0.75 + overall / 120)));
+    season.goals = played.reduce((sum, match) => sum + match.goals, 0);
+    season.assists = played.reduce((sum, match) => sum + match.assists, 0);
   }
 
+  season.squadStatus = squadStatusFromSeason(season);
+  season.form = formLabel(season.rating);
+  season.evaluation = buildSeasonEvaluation(character, season);
+
+  let coachChange = 0;
+  if (season.rating >= 7.4) coachChange += 6;
+  else if (season.rating >= 6.9) coachChange += 3;
+  else if (season.rating < 6.2) coachChange -= 5;
+  if (season.squadStatus === "Fora dos planos") coachChange -= 4;
+  if (character.personality.professionalism >= 70) coachChange += 2;
+  character.relations.coach = clamp(character.relations.coach + coachChange);
+
   const reputationGain =
-    rating >= 7.5 ? 3 :
-    rating >= 7.0 ? 2 :
-    rating >= 6.5 ? 1 : 0;
+    season.squadStatus === "Destaque" ? 4 :
+    season.rating >= 7.2 ? 2 :
+    season.rating >= 6.7 ? 1 : 0;
 
   character.life.reputation = clamp(character.life.reputation + reputationGain);
-  character.life.health = clamp(character.life.health + randomNumber(-3, 2));
-  character.life.happiness = clamp(character.life.happiness + randomNumber(-2, 3));
+  character.life.health = clamp(character.life.health + randomNumber(-4, 2));
+  character.life.happiness = clamp(character.life.happiness + (season.squadStatus === "Destaque" ? 4 : season.squadStatus === "Fora dos planos" ? -5 : randomNumber(-2, 2)));
 
-  growPlayer(character);
+  growPlayer(character, season);
+
+  character.football.squadStatus = season.squadStatus;
+  character.football.form = season.form;
+  character.football.positionCompetition = clamp(character.football.positionCompetition + randomNumber(-1, 1), 1, 5);
 
   character.seasons.push(season);
   character.pendingYear.season = season;
+  character.pendingYear.marketOutcome = buildMarketOutcome(character, season);
 
   addHistory(
     character,
     "Fim da temporada",
-    `Terminou a temporada com ${appearances} partidas e média ${rating.toFixed(1)} pelo ${character.club}.`,
+    `Terminou a temporada com ${season.appearances} jogos, ${season.minutes} minutos e média ${season.rating.toFixed(1)} pelo ${character.club}. Status final: ${season.squadStatus}.`,
     "Futebol"
   );
 
@@ -1261,29 +1692,207 @@ function completeEventPhase(character) {
   renderYearSummary(character);
 }
 
+function matchExtraText(character, match) {
+  if (!match.appeared) return "Não utilizado";
+  if (character.position === "Goleiro") {
+    return `${match.saves || 0} defesas · ${match.conceded || 0} sofrido${match.conceded === 1 ? "" : "s"}`;
+  }
+  const pieces = [];
+  if (match.goals) pieces.push(`${match.goals} gol${match.goals > 1 ? "s" : ""}`);
+  if (match.assists) pieces.push(`${match.assists} assist.`);
+  return pieces.length ? pieces.join(" · ") : "Sem participação em gol";
+}
+
+function renderRecentMatches(character, season) {
+  const container = document.getElementById("recentMatches");
+  const matches = season.recentMatches || [];
+
+  if (!matches.length) {
+    container.innerHTML = `<div class="timeline-item">Nenhuma partida registrada nesta temporada.</div>`;
+    return;
+  }
+
+  container.innerHTML = matches.map(match => `
+    <div class="match-row">
+      <div class="match-opponent">x ${match.opponent}</div>
+      <div class="match-score">${match.ownGoals}–${match.opponentGoals}</div>
+      <div class="match-meta">${match.appeared ? `${match.minutes} min` : "Banco"}</div>
+      <div class="match-meta">${match.rating ? `Nota ${Number(match.rating).toFixed(1)}` : "Sem nota"}</div>
+      <div class="match-extra">${matchExtraText(character, match)}</div>
+    </div>
+  `).join("");
+}
+
+function marketCopy(character, market) {
+  if (!market) return null;
+  if (market.type === "trial") {
+    return {
+      title: `${market.club} quer observar você de perto`,
+      text: `Depois da sua temporada, surgiu um convite para participar de uma avaliação no ${market.club}. Ir significa se expor a uma nova oportunidade, mas também mexer na estabilidade que você já possui.`,
+      choices: [
+        ["accept", `Aceitar a avaliação no ${market.club}`, "Você topa conhecer uma nova realidade."],
+        ["stay", `Continuar no ${character.club}`, "Você prefere manter o processo no clube atual."]
+      ]
+    };
+  }
+  if (market.type === "interest") {
+    return {
+      title: `Outro clube entrou no seu caminho`,
+      text: `O ${market.club} demonstrou interesse em levar você para a sua categoria de base. A mudança pode abrir portas, mas não existe garantia de mais minutos ou de adaptação imediata.`,
+      choices: [
+        ["accept", `Aceitar o projeto do ${market.club}`, "Mudar de clube e recomeçar a disputa por espaço."],
+        ["stay", `Permanecer no ${character.club}`, "Valorizar a continuidade no clube atual."]
+      ]
+    };
+  }
+  if (market.type === "release") {
+    return {
+      title: `O ${character.club} decidiu liberar você`,
+      text: `A comissão informou que você não seguirá no elenco. Sua carreira como jogador não acabou: agora é preciso escolher como reagir a uma das situações mais duras da formação.`,
+      choices: [
+        ["tryout", `Buscar avaliação no ${market.club}`, "Tentar imediatamente uma nova oportunidade."],
+        ["local", "Voltar para um clube menor e continuar jogando", "Reduzir o nível de exposição, mas manter minutos e rotina."],
+        ["pause", "Ficar sem clube por enquanto", "Manter os estudos e esperar outra oportunidade."]
+      ]
+    };
+  }
+  if (market.type === "tryout") {
+    return {
+      title: `Uma chance de voltar ao futebol organizado`,
+      text: `Depois de um período sem clube, aparece a possibilidade de fazer uma avaliação no ${market.club}.`,
+      choices: [
+        ["tryout", `Participar da avaliação no ${market.club}`, "Você volta a se colocar à prova."],
+        ["pause", "Esperar outra oportunidade", "Você ainda não se sente pronto para essa avaliação."]
+      ]
+    };
+  }
+  return null;
+}
+
+function resolveMarketDecision(character, decision) {
+  const market = character.pendingYear?.marketOutcome;
+  if (!market || market.resolved) return;
+
+  let result = "";
+
+  if (["trial", "interest"].includes(market.type)) {
+    if (decision === "accept") {
+      changeClub(character, market.club, market.type === "trial" ? "Aceitou uma nova oportunidade de avaliação" : "Aceitou o projeto de outro clube");
+      result = `Você decidiu mudar o rumo da carreira e agora passa a defender o ${market.club}. A confiança com a nova comissão começa praticamente do zero.`;
+    } else {
+      character.relations.coach = clamp(character.relations.coach + 2);
+      result = `Você decidiu permanecer no ${character.club} e dar continuidade ao trabalho que já vinha construindo.`;
+      addHistory(character, "Decisão de carreira", `Recusou uma oportunidade do ${market.club} e permaneceu no ${character.club}.`, "Futebol");
+    }
+  } else if (market.type === "release") {
+    if (decision === "tryout") {
+      const chance = clamp(0.48 + character.life.reputation * 0.018 + character.personality.resilience / 300, 0.48, 0.86);
+      if (Math.random() < chance) {
+        changeClub(character, market.club, "Aprovado em avaliação após ser liberado");
+        result = `Você foi aprovado na avaliação e ganhou uma nova oportunidade no ${market.club}. A dispensa ficou para trás, mas agora começa uma nova disputa por espaço.`;
+      } else {
+        changeClub(character, "Sem clube", "Não foi aprovado na primeira avaliação após a dispensa");
+        result = `A avaliação não terminou em aprovação. Você fica sem clube por enquanto, mas sua vida continua e novas oportunidades ainda podem aparecer.`;
+      }
+    } else if (decision === "local") {
+      changeClub(character, "Clube pequeno da cidade", "Buscou minutos e continuidade após uma dispensa");
+      result = "Você escolheu reduzir o nível competitivo por um período para continuar jogando, recuperar confiança e reconstruir o caminho.";
+    } else {
+      changeClub(character, "Sem clube", "Decidiu dar um tempo após uma dispensa");
+      result = "Você fica sem clube por enquanto. Escola, família e preparação individual ganham ainda mais importância nessa fase.";
+    }
+  } else if (market.type === "tryout") {
+    if (decision === "tryout") {
+      const chance = clamp(0.50 + character.personality.discipline / 350 + character.life.reputation * 0.012, 0.50, 0.82);
+      if (Math.random() < chance) {
+        changeClub(character, market.club, "Aprovado em avaliação enquanto estava sem clube");
+        result = `A avaliação deu certo. Você passa a integrar o ${market.club} e volta ao futebol organizado.`;
+      } else {
+        result = `Você não foi aprovado desta vez. Continua sem clube, mas acumulou experiência e ainda poderá tentar novamente em outros momentos.`;
+        addHistory(character, "Avaliação sem aprovação", `Fez uma avaliação no ${market.club}, mas não foi aprovado.`, "Futebol");
+      }
+    } else {
+      result = "Você decidiu esperar. Continua sem clube por enquanto e mantém a preparação para oportunidades futuras.";
+    }
+  }
+
+  market.resolved = true;
+  market.decision = decision;
+  market.resultText = result;
+  saveCharacter(character);
+  renderYearSummary(character);
+}
+
+function renderMarketCard(character) {
+  const card = document.getElementById("marketCard");
+  const finishButton = document.getElementById("finishYearButton");
+  const market = character.pendingYear?.marketOutcome;
+
+  if (!market) {
+    card.classList.add("hidden");
+    finishButton.classList.remove("hidden");
+    return;
+  }
+
+  const copy = marketCopy(character, market);
+  if (!copy) {
+    card.classList.add("hidden");
+    finishButton.classList.remove("hidden");
+    return;
+  }
+
+  card.classList.remove("hidden");
+  document.getElementById("marketTitle").textContent = copy.title;
+  document.getElementById("marketText").textContent = copy.text;
+
+  const choices = document.getElementById("marketChoices");
+  const result = document.getElementById("marketResult");
+
+  if (market.resolved) {
+    choices.classList.add("hidden");
+    result.classList.remove("hidden");
+    result.textContent = market.resultText;
+    finishButton.classList.remove("hidden");
+  } else {
+    choices.classList.remove("hidden");
+    result.classList.add("hidden");
+    finishButton.classList.add("hidden");
+    choices.innerHTML = "";
+
+    copy.choices.forEach(([value, label, hint]) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "choice-button";
+      button.innerHTML = `<strong>${label}</strong><span>${hint}</span>`;
+      button.addEventListener("click", () => resolveMarketDecision(character, value));
+      choices.appendChild(button);
+    });
+  }
+}
+
 function renderYearSummary(character) {
   const pending = character.pendingYear;
-  const season = pending.season;
+  const season = normalizeSeason(pending.season);
 
   document.getElementById("summaryYear").textContent = season.year;
-  document.getElementById("summaryTitle").textContent =
-    `${character.name}, ${character.age} anos`;
-
-  document.getElementById("summarySubtitle").textContent =
-    `${character.club} · ${character.position}`;
+  document.getElementById("summaryTitle").textContent = `${character.name}, ${character.age} anos`;
+  document.getElementById("summarySubtitle").textContent = `${season.club} · ${season.position}`;
 
   const stats = [
     ["PARTIDAS", season.appearances],
     ["TITULAR", season.starts],
-    ["MÉDIA", season.rating.toFixed(1)]
+    ["MINUTOS", season.minutes],
+    ["MÉDIA", season.rating ? Number(season.rating).toFixed(1) : "—"],
+    ["STATUS", season.squadStatus]
   ];
 
-  if (character.position === "Goleiro") {
-    stats.push(["JOGOS SEM SOFRER GOL", season.cleanSheets]);
-    stats.push(["GOLS SOFRIDOS", season.goalsConceded]);
+  if (season.position === "Goleiro") {
+    stats.push(["SEM SOFRER GOL", season.cleanSheets || 0]);
+    stats.push(["DEFESAS", season.saves || 0]);
+    stats.push(["GOLS SOFRIDOS", season.goalsConceded || 0]);
   } else {
-    stats.push(["GOLS", season.goals]);
-    stats.push(["ASSISTÊNCIAS", season.assists]);
+    stats.push(["GOLS", season.goals || 0]);
+    stats.push(["ASSISTÊNCIAS", season.assists || 0]);
   }
 
   document.getElementById("seasonStats").innerHTML = stats
@@ -1294,6 +1903,11 @@ function renderYearSummary(character) {
       </div>
     `)
     .join("");
+
+  const evaluation = season.evaluation || buildSeasonEvaluation(character, season);
+  document.getElementById("seasonEvaluationTitle").textContent = evaluation.title;
+  document.getElementById("seasonEvaluationText").textContent = evaluation.text;
+  renderRecentMatches(character, season);
 
   const highlights = pending.chosenHistory.length
     ? pending.chosenHistory
@@ -1308,9 +1922,8 @@ function renderYearSummary(character) {
     `)
     .join("");
 
-  document.getElementById("finishYearButton").textContent =
-    `COMPLETAR ${character.age + 1} ANOS`;
-
+  document.getElementById("finishYearButton").textContent = `COMPLETAR ${character.age + 1} ANOS`;
+  renderMarketCard(character);
   changeScreen("summary");
 }
 
