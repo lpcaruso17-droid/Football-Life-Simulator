@@ -1,4 +1,8 @@
 import {
+    randomInt
+} from "../core/rng.js";
+
+import {
     YEAR_PHASES,
     beginYear,
     setPhase,
@@ -27,6 +31,14 @@ import {
 import {
     FAMILY_EVENTS
 } from "../events/family.js";
+
+import {
+    CHILDHOOD_EVENTS
+} from "../events/childhood.js";
+
+import {
+    ACADEMY_EVENTS
+} from "../events/academy.js";
 
 import {
     CAREER_EVENTS
@@ -64,9 +76,128 @@ function createRuntimeKey(
 }
 
 
+function calculateTargetEvents(
+    gameState
+) {
+    const age =
+        gameState.calendar.age;
+
+    let minimum = 2;
+    let maximum = 3;
+
+    if (
+        age >= 12 &&
+        age <= 14
+    ) {
+        minimum = 3;
+        maximum = 4;
+    }
+
+    if (
+        age >= 15 &&
+        age <= 17
+    ) {
+        minimum = 4;
+        maximum = 5;
+    }
+
+    if (age >= 18) {
+        minimum = 4;
+        maximum = 5;
+    }
+
+    if (
+        !gameState.player
+            .football
+            .currentClubId
+    ) {
+        maximum += 1;
+    }
+
+    if (
+        gameState.housing
+            ?.pendingRelocation
+    ) {
+        minimum += 1;
+    }
+
+    minimum =
+        Math.min(
+            minimum,
+            6
+        );
+
+    maximum =
+        Math.min(
+            Math.max(
+                minimum,
+                maximum
+            ),
+            6
+        );
+
+    return randomInt(
+        gameState.rng,
+        minimum,
+        maximum
+    );
+}
+
+
+function distributeEventsAcrossPhases(
+    targetEvents
+) {
+    const distribution = {
+        preseason: 0,
+        early_season: 0,
+        mid_season: 0,
+        late_season: 0,
+        offseason: 0
+    };
+
+    const priorityOrder = [
+        "preseason",
+        "mid_season",
+        "offseason",
+        "early_season",
+        "late_season"
+    ];
+
+    let remaining =
+        targetEvents;
+
+    let index = 0;
+
+    while (
+        remaining > 0
+    ) {
+        const phase =
+            priorityOrder[
+                index %
+                priorityOrder.length
+            ];
+
+        distribution[
+            phase
+        ] += 1;
+
+        remaining--;
+
+        index++;
+    }
+
+    return distribution;
+}
+
+
 function createRuntimeFlow(
     gameState
 ) {
+    const targetEvents =
+        calculateTargetEvents(
+            gameState
+        );
+
     return {
         saveId:
             createRuntimeKey(
@@ -78,13 +209,31 @@ function createRuntimeFlow(
 
         phaseIndex: 0,
 
+        phaseEventCounts: {
+            preseason: 0,
+            early_season: 0,
+            mid_season: 0,
+            late_season: 0,
+            offseason: 0
+        },
+
+        phaseEventTargets:
+            distributeEventsAcrossPhases(
+                targetEvents
+            ),
+
+        targetEvents,
+
+        totalEventsResolved: 0,
+
+        eventsSeen: [],
+
         currentEvent: null,
 
         currentEventResolved:
             false,
 
-        completed:
-            false,
+        completed: false,
 
         summary: null
     };
@@ -131,55 +280,56 @@ function getOrCreateRuntimeFlow(
 }
 
 
-function getGeneralEventPool() {
-    return [
+function getGeneralEventPool(
+    gameState
+) {
+    const pool = [
         ...EDUCATION_EVENTS,
         ...FRIEND_EVENTS,
         ...FAMILY_EVENTS,
         ...CAREER_EVENTS
     ];
+
+    if (
+        gameState.calendar.age <=
+        13
+    ) {
+        pool.push(
+            ...CHILDHOOD_EVENTS
+        );
+    }
+
+    if (
+        gameState.player
+            .football
+            .currentClubId
+    ) {
+        pool.push(
+            ...ACADEMY_EVENTS
+        );
+    }
+
+    return pool;
 }
 
 
 function findForcedHousingEvent(
-    gameState
+    gameState,
+    flow
 ) {
     const eligible =
         getEligibleEvents(
             gameState,
-            HOUSING_EVENTS
+            HOUSING_EVENTS,
+            {
+                excludeEventIds:
+                    flow.eventsSeen
+            }
         );
 
     return (
         eligible[0] ??
         null
-    );
-}
-
-
-function chooseClublessEvent(
-    gameState
-) {
-    const clublessCareerEvents =
-        CAREER_EVENTS.filter(
-            definition => {
-                const event =
-                    typeof definition ===
-                        "function"
-                        ? definition(
-                            gameState
-                        )
-                        : definition;
-
-                return Boolean(
-                    event
-                );
-            }
-        );
-
-    return drawEvent(
-        gameState,
-        clublessCareerEvents
     );
 }
 
@@ -209,48 +359,23 @@ function getProfessionalMilestoneEvents(
         .filter(
             event =>
                 event.category ===
-                "professional"
+                    "professional"
         );
 }
 
 
 function choosePhaseEvent(
-    gameState
+    gameState,
+    flow
 ) {
-    /*
-     * Mudança de cidade é uma
-     * decisão estrutural e tem
-     * prioridade.
-     */
     const housingEvent =
         findForcedHousingEvent(
-            gameState
+            gameState,
+            flow
         );
 
     if (housingEvent) {
         return housingEvent;
-    }
-
-
-    /*
-     * Sem clube, o futebol precisa
-     * reagir ao desemprego do atleta
-     * antes de tentar gerar marcos
-     * profissionais impossíveis.
-     */
-    if (
-        !gameState.player
-            .football
-            .currentClubId
-    ) {
-        const clublessEvent =
-            chooseClublessEvent(
-                gameState
-            );
-
-        if (clublessEvent) {
-            return clublessEvent;
-        }
     }
 
 
@@ -265,7 +390,11 @@ function choosePhaseEvent(
         const professionalEvent =
             drawEvent(
                 gameState,
-                professionalEvents
+                professionalEvents,
+                {
+                    excludeEventIds:
+                        flow.eventsSeen
+                }
             );
 
         if (professionalEvent) {
@@ -276,44 +405,13 @@ function choosePhaseEvent(
 
     return drawEvent(
         gameState,
-        getGeneralEventPool()
-    );
-}
-
-
-function shouldHaveLifeEvent(
-    gameState,
-    phaseIndex
-) {
-    const age =
-        gameState.calendar.age;
-
-    /*
-     * Todo ano tem pelo menos:
-     * pré-temporada,
-     * meio do ano,
-     * fim da temporada.
-     *
-     * A adolescência ganha
-     * mais acontecimentos.
-     */
-    const pattern = [
-        true,
-
-        age >= 12,
-
-        true,
-
-        age >= 15,
-
-        true
-    ];
-
-    return (
-        pattern[
-            phaseIndex
-        ] ??
-        false
+        getGeneralEventPool(
+            gameState
+        ),
+        {
+            excludeEventIds:
+                flow.eventsSeen
+        }
     );
 }
 
@@ -346,6 +444,12 @@ function createYearSummary(
 
         academyDecision,
 
+        eventsExperienced:
+            gameState.eventState
+                .recentEvents
+                ?.length ??
+            0,
+
         happiness:
             gameState.player
                 .life
@@ -377,10 +481,6 @@ function finalizeYear(
         null;
 
 
-    /*
-     * Sem clube, simplesmente não
-     * existe temporada oficial.
-     */
     if (
         gameState.player
             .football
@@ -426,7 +526,6 @@ function finalizeYear(
             gameState,
             {
                 season,
-
                 academyDecision
             }
         );
@@ -456,6 +555,9 @@ function finalizeYear(
 
                 age:
                     gameState.calendar.age,
+
+                eventsExperienced:
+                    flow.totalEventsResolved,
 
                 hadClub:
                     Boolean(
@@ -527,13 +629,6 @@ export function getNextYearStep(
     }
 
 
-    /*
-     * Evento já apresentado e ainda
-     * não resolvido.
-     *
-     * Sair da tela e voltar NÃO
-     * rerrola o acontecimento.
-     */
     if (
         flow.currentEvent &&
         !flow
@@ -568,27 +663,33 @@ export function getNextYearStep(
         );
 
 
-        flow.currentEvent =
-            null;
+        const target =
+            flow.phaseEventTargets[
+                phase
+            ] ?? 0;
 
-        flow.currentEventResolved =
-            false;
+        const completed =
+            flow.phaseEventCounts[
+                phase
+            ] ?? 0;
 
 
         if (
-            shouldHaveLifeEvent(
-                gameState,
-                flow.phaseIndex
-            )
+            completed <
+            target
         ) {
             const event =
                 choosePhaseEvent(
-                    gameState
+                    gameState,
+                    flow
                 );
 
             if (event) {
                 flow.currentEvent =
                     event;
+
+                flow.currentEventResolved =
+                    false;
 
                 return {
                     type:
@@ -599,6 +700,16 @@ export function getNextYearStep(
                     event
                 };
             }
+
+            /*
+             * Se não houver nenhum
+             * evento válido, essa vaga
+             * do calendário é ignorada.
+             */
+            flow.phaseEventCounts[
+                phase
+            ] =
+                target;
         }
 
 
@@ -633,12 +744,46 @@ export function resolveCurrentYearEvent(
     }
 
 
+    const event =
+        flow.currentEvent;
+
+    const currentPhase =
+        gameState.calendar.phase;
+
+
     const resolution =
         resolveEventChoice(
             gameState,
-            flow.currentEvent,
+            event,
             choiceId
         );
+
+
+    if (
+        !flow.eventsSeen
+            .includes(
+                event.id
+            )
+    ) {
+        flow.eventsSeen.push(
+            event.id
+        );
+    }
+
+
+    flow.totalEventsResolved +=
+        1;
+
+    flow.phaseEventCounts[
+        currentPhase
+    ] =
+        (
+            flow.phaseEventCounts[
+                currentPhase
+            ] ??
+            0
+        ) +
+        1;
 
 
     flow.currentEventResolved =
@@ -647,8 +792,25 @@ export function resolveCurrentYearEvent(
     flow.currentEvent =
         null;
 
-    flow.phaseIndex +=
-        1;
+
+    const target =
+        flow.phaseEventTargets[
+            currentPhase
+        ] ?? 0;
+
+    const completed =
+        flow.phaseEventCounts[
+            currentPhase
+        ] ?? 0;
+
+
+    if (
+        completed >=
+        target
+    ) {
+        flow.phaseIndex +=
+            1;
+    }
 
 
     return {

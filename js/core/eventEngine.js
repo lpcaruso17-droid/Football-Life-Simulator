@@ -7,7 +7,9 @@ import {
 } from "../systems/timelineSystem.js";
 
 
-const RECENT_EVENT_LIMIT = 5;
+const RECENT_EVENT_LIMIT = 8;
+
+const RECENT_THEME_LIMIT = 4;
 
 
 function ensureEventMemory(
@@ -16,13 +18,7 @@ function ensureEventMemory(
     if (
         !gameState.eventState
     ) {
-        gameState.eventState = {
-            completed: [],
-            cooldowns: {},
-            activeChains: {},
-            completedChains: [],
-            flags: {}
-        };
+        gameState.eventState = {};
     }
 
     if (
@@ -52,6 +48,16 @@ function ensureEventMemory(
         gameState.eventState
             .recentEvents = [];
     }
+
+    if (
+        !Array.isArray(
+            gameState.eventState
+                .recentThemes
+        )
+    ) {
+        gameState.eventState
+            .recentThemes = [];
+    }
 }
 
 
@@ -61,8 +67,9 @@ function isOnCooldown(
 ) {
     const lastYear =
         gameState.eventState
-            ?.cooldowns
-            ?.[event.id];
+            .cooldowns[
+                event.id
+            ];
 
     if (
         lastYear === undefined ||
@@ -116,16 +123,43 @@ function buildEvent(
 }
 
 
-function filterRecentEvents(
+function filterCurrentYearDuplicates(
+    events,
+    excludeEventIds
+) {
+    if (
+        !Array.isArray(
+            excludeEventIds
+        ) ||
+        !excludeEventIds.length
+    ) {
+        return events;
+    }
+
+    const alternatives =
+        events.filter(
+            event =>
+                !excludeEventIds
+                    .includes(
+                        event.id
+                    )
+        );
+
+    return alternatives.length
+        ? alternatives
+        : events;
+}
+
+
+function filterRecentEventIds(
     gameState,
     events
 ) {
     const recent =
         gameState.eventState
-            .recentEvents ??
-        [];
+            .recentEvents;
 
-    const freshEvents =
+    const alternatives =
         events.filter(
             event =>
                 !recent.includes(
@@ -133,66 +167,111 @@ function filterRecentEvents(
                 )
         );
 
-    /*
-     * Só bloqueamos eventos recentes
-     * quando existe alternativa.
-     *
-     * Assim evitamos repetição,
-     * mas também evitamos ficar
-     * sem nenhum evento possível.
-     */
-    return freshEvents.length
-        ? freshEvents
+    return alternatives.length
+        ? alternatives
         : events;
 }
 
 
-function rememberEvent(
+function filterRecentThemes(
     gameState,
-    eventId
+    events
 ) {
-    ensureEventMemory(
-        gameState
-    );
-
-    const recent =
+    const recentThemes =
         gameState.eventState
-            .recentEvents;
+            .recentThemes;
+
+    const alternatives =
+        events.filter(
+            event => {
+                if (!event.theme) {
+                    return true;
+                }
+
+                return (
+                    !recentThemes.includes(
+                        event.theme
+                    )
+                );
+            }
+        );
+
+    return alternatives.length
+        ? alternatives
+        : events;
+}
+
+
+function rememberValue(
+    array,
+    value,
+    limit
+) {
+    if (!value) {
+        return;
+    }
 
     const existingIndex =
-        recent.indexOf(
-            eventId
+        array.indexOf(
+            value
         );
 
     if (existingIndex >= 0) {
-        recent.splice(
+        array.splice(
             existingIndex,
             1
         );
     }
 
-    recent.push(
-        eventId
+    array.push(
+        value
     );
 
     while (
-        recent.length >
-        RECENT_EVENT_LIMIT
+        array.length >
+        limit
     ) {
-        recent.shift();
+        array.shift();
     }
 }
 
 
-export function getEligibleEvents(
+function rememberEvent(
     gameState,
-    eventDefinitions
+    event
 ) {
     ensureEventMemory(
         gameState
     );
 
-    const eligible =
+    rememberValue(
+        gameState.eventState
+            .recentEvents,
+        event.id,
+        RECENT_EVENT_LIMIT
+    );
+
+    rememberValue(
+        gameState.eventState
+            .recentThemes,
+        event.theme,
+        RECENT_THEME_LIMIT
+    );
+}
+
+
+export function getEligibleEvents(
+    gameState,
+    eventDefinitions,
+    {
+        excludeEventIds = []
+    } = {}
+) {
+    ensureEventMemory(
+        gameState
+    );
+
+    let eligible =
         (
             eventDefinitions ??
             []
@@ -274,8 +353,8 @@ export function getEligibleEvents(
                         !Array.isArray(
                             event.choices
                         ) ||
-                        !event.choices
-                            .length
+                        event.choices
+                            .length === 0
                     ) {
                         return false;
                     }
@@ -284,21 +363,38 @@ export function getEligibleEvents(
                 }
             );
 
-    return filterRecentEvents(
-        gameState,
-        eligible
-    );
+    eligible =
+        filterCurrentYearDuplicates(
+            eligible,
+            excludeEventIds
+        );
+
+    eligible =
+        filterRecentEventIds(
+            gameState,
+            eligible
+        );
+
+    eligible =
+        filterRecentThemes(
+            gameState,
+            eligible
+        );
+
+    return eligible;
 }
 
 
 export function drawEvent(
     gameState,
-    eventDefinitions
+    eventDefinitions,
+    options = {}
 ) {
     const eligible =
         getEligibleEvents(
             gameState,
-            eventDefinitions
+            eventDefinitions,
+            options
         );
 
     if (!eligible.length) {
@@ -347,14 +443,6 @@ export function resolveEventChoice(
 
     let result = null;
 
-    /*
-     * O efeito da decisão acontece
-     * antes de marcarmos o evento
-     * como concluído.
-     *
-     * Se o efeito falhar, o jogo
-     * não grava uma decisão inválida.
-     */
     if (
         typeof choice.apply ===
         "function"
@@ -389,7 +477,7 @@ export function resolveEventChoice(
 
     rememberEvent(
         gameState,
-        event.id
+        event
     );
 
     addTimelineEntry(
@@ -416,6 +504,10 @@ export function resolveEventChoice(
             metadata: {
                 eventId:
                     event.id,
+
+                theme:
+                    event.theme ??
+                    null,
 
                 choiceId:
                     choice.id
