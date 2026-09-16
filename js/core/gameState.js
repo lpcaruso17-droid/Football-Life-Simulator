@@ -7,7 +7,7 @@ import {
 export const GAME_VERSION =
     "0.5.0-alpha";
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 
 function createId(prefix) {
@@ -39,7 +39,6 @@ export function createBlankPlayer({
 
         identity: {
             fullName: "",
-
             gender: "male",
 
             birthYear:
@@ -47,17 +46,14 @@ export function createBlankPlayer({
                 startAge,
 
             nationality: "BR",
-
             secondNationality: null,
 
             birthCityId: null,
-
             currentCityId: null
         },
 
         physical: {
             heightCm: null,
-
             weightKg: null,
 
             dominantFoot: null
@@ -65,11 +61,9 @@ export function createBlankPlayer({
 
         football: {
             position: null,
-
             secondaryPositions: [],
 
             currentClubId: null,
-
             currentClubName: null,
 
             currentCategory: null,
@@ -86,11 +80,8 @@ export function createBlankPlayer({
 
         attributes: {
             technical: {},
-
             physical: {},
-
             mental: {},
-
             goalkeeper: {}
         },
 
@@ -99,21 +90,13 @@ export function createBlankPlayer({
 
             personality: {
                 professionalism: null,
-
                 discipline: null,
-
                 ambition: null,
-
                 resilience: null,
-
                 loyalty: null,
-
                 sociability: null,
-
                 ego: null,
-
                 adaptability: null,
-
                 intelligence: null
             }
         },
@@ -211,8 +194,7 @@ export function createGameState({
 
             startingPath: null,
 
-            relocationRequired:
-                false,
+            relocationRequired: false,
 
             housingMode:
                 "family_home",
@@ -220,14 +202,11 @@ export function createGameState({
             evaluationStatus:
                 "registered",
 
-            currentEvaluation:
-                null,
+            currentEvaluation: null,
 
-            lastDecision:
-                null,
+            lastDecision: null,
 
-            developmentScore:
-                null,
+            developmentScore: null,
 
             recognition: 0,
 
@@ -240,6 +219,40 @@ export function createGameState({
             offers: [],
 
             trials: [],
+
+            history: []
+        },
+
+        housing: {
+            type: "family_home",
+
+            cityId: null,
+
+            familyCityId: null,
+
+            clubId: null,
+
+            quality: 60,
+
+            familyMoved: false,
+
+            pendingRelocation: false,
+
+            sinceYear: startYear,
+
+            history: []
+        },
+
+        social: {
+            closeFriendIds: [],
+
+            friendIds: [],
+
+            teammateIds: [],
+
+            formerTeammateIds: [],
+
+            socialLife: 60,
 
             history: []
         },
@@ -280,9 +293,13 @@ export function createGameState({
 
             institutionName: null,
 
+            cityId: null,
+
             performance: 70,
 
             attendance: 100,
+
+            clubMonitoring: false,
 
             completedHighSchool:
                 false,
@@ -321,15 +338,10 @@ export function createGameState({
 
             byGroup: {
                 clubs: 0,
-
                 players: 0,
-
                 agents: 0,
-
                 media: 0,
-
                 fans: 0,
-
                 sponsors: 0
             },
 

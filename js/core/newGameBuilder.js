@@ -15,6 +15,18 @@ import {
 } from "../systems/academySystem.js";
 
 import {
+    initializeHousing
+} from "../systems/housingSystem.js";
+
+import {
+    initializeEducation
+} from "../systems/educationSystem.js";
+
+import {
+    initializeSocialCircle
+} from "../systems/socialSystem.js";
+
+import {
     addTimelineEntry
 } from "../systems/timelineSystem.js";
 
@@ -106,6 +118,18 @@ export function buildNewGame({
             preferredClubId:
                 clubId
         }
+    );
+
+    initializeHousing(
+        gameState
+    );
+
+    initializeEducation(
+        gameState
+    );
+
+    initializeSocialCircle(
+        gameState
     );
 
     addTimelineEntry(
