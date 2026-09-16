@@ -7,7 +7,7 @@ import {
 export const GAME_VERSION =
     "0.5.0-alpha";
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 
 function createId(prefix) {
@@ -55,7 +55,6 @@ export function createBlankPlayer({
         physical: {
             heightCm: null,
             weightKg: null,
-
             dominantFoot: null
         },
 
@@ -103,11 +102,8 @@ export function createBlankPlayer({
 
         life: {
             happiness: 75,
-
             generalHealth: 100,
-
             physicalCondition: 100,
-
             fame: 0
         }
     };
@@ -185,11 +181,9 @@ export function createGameState({
 
         academy: {
             currentClubId: null,
-
             currentCategory: null,
 
             joinedYear: null,
-
             joinedAge: null,
 
             startingPath: null,
@@ -203,7 +197,6 @@ export function createGameState({
                 "registered",
 
             currentEvaluation: null,
-
             lastDecision: null,
 
             developmentScore: null,
@@ -217,8 +210,22 @@ export function createGameState({
                 null,
 
             offers: [],
-
             trials: [],
+            history: []
+        },
+
+        footballContext: {
+            currentCoachId: null,
+
+            coachTrust: 45,
+
+            form: 50,
+
+            positionCompetition: 0,
+
+            currentSeasonId: null,
+
+            lastSeasonSummary: null,
 
             history: []
         },
@@ -307,7 +314,6 @@ export function createGameState({
 
         people: {
             byId: {},
-
             allIds: []
         },
 
@@ -317,27 +323,22 @@ export function createGameState({
 
         clubs: {
             byId: {},
-
             allIds: []
         },
 
         contracts: {
             byId: {},
-
             allIds: [],
 
             activeContractId: null,
 
             offers: [],
-
             alerts: [],
-
             history: []
         },
 
         seasons: {
             byId: {},
-
             allIds: []
         },
 
