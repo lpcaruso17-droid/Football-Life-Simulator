@@ -11,6 +11,10 @@ import {
 } from "../systems/familySystem.js";
 
 import {
+    initializeAcademyCareer
+} from "../systems/academySystem.js";
+
+import {
     addTimelineEntry
 } from "../systems/timelineSystem.js";
 
@@ -34,6 +38,8 @@ export function buildNewGame({
     positionId = null,
 
     dominantFoot = null,
+
+    clubId = null,
 
     seed = undefined
 } = {}) {
@@ -60,8 +66,11 @@ export function buildNewGame({
     const gameState =
         createGameState({
             saveName,
+
             startAge: age,
+
             startYear,
+
             seed
         });
 
@@ -91,6 +100,14 @@ export function buildNewGame({
         gameState
     );
 
+    initializeAcademyCareer(
+        gameState,
+        {
+            preferredClubId:
+                clubId
+        }
+    );
+
     addTimelineEntry(
         gameState,
         {
@@ -110,7 +127,17 @@ export function buildNewGame({
                     age,
 
                 startingYear:
-                    startYear
+                    startYear,
+
+                startingClubId:
+                    gameState
+                        .academy
+                        .currentClubId,
+
+                startingCategory:
+                    gameState
+                        .academy
+                        .currentCategory
             }
         }
     );

@@ -7,7 +7,7 @@ import {
 export const GAME_VERSION =
     "0.5.0-alpha";
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 
 function createId(prefix) {
@@ -39,6 +39,7 @@ export function createBlankPlayer({
 
         identity: {
             fullName: "",
+
             gender: "male",
 
             birthYear:
@@ -46,14 +47,17 @@ export function createBlankPlayer({
                 startAge,
 
             nationality: "BR",
+
             secondNationality: null,
 
             birthCityId: null,
+
             currentCityId: null
         },
 
         physical: {
             heightCm: null,
+
             weightKg: null,
 
             dominantFoot: null
@@ -61,9 +65,11 @@ export function createBlankPlayer({
 
         football: {
             position: null,
+
             secondaryPositions: [],
 
             currentClubId: null,
+
             currentClubName: null,
 
             currentCategory: null,
@@ -80,8 +86,11 @@ export function createBlankPlayer({
 
         attributes: {
             technical: {},
+
             physical: {},
+
             mental: {},
+
             goalkeeper: {}
         },
 
@@ -90,20 +99,30 @@ export function createBlankPlayer({
 
             personality: {
                 professionalism: null,
+
                 discipline: null,
+
                 ambition: null,
+
                 resilience: null,
+
                 loyalty: null,
+
                 sociability: null,
+
                 ego: null,
+
                 adaptability: null,
+
                 intelligence: null
             }
         },
 
         life: {
             happiness: 75,
+
             generalHealth: 100,
+
             physicalCondition: 100,
 
             fame: 0
@@ -114,7 +133,9 @@ export function createBlankPlayer({
 
 export function createGameState({
     saveName = "Nova vida",
+
     startAge = 10,
+
     startYear =
         new Date().getFullYear(),
 
@@ -143,7 +164,9 @@ export function createGameState({
             name: saveName,
 
             createdAt,
-            updatedAt: createdAt,
+
+            updatedAt:
+                createdAt,
 
             lastSaveReason:
                 "creation"
@@ -163,9 +186,10 @@ export function createGameState({
             seasonCompleted: false
         },
 
-        rng: createRngState(
-            seed
-        ),
+        rng:
+            createRngState(
+                seed
+            ),
 
         player:
             player ??
@@ -174,8 +198,37 @@ export function createGameState({
                 startYear
             }),
 
+        family: null,
+
+        academy: {
+            currentClubId: null,
+
+            currentCategory: null,
+
+            joinedYear: null,
+
+            joinedAge: null,
+
+            startingPath: null,
+
+            relocationRequired:
+                false,
+
+            housingMode:
+                "family_home",
+
+            evaluationStatus:
+                "registered",
+
+            developmentScore:
+                null,
+
+            history: []
+        },
+
         people: {
             byId: {},
+
             allIds: []
         },
 
@@ -185,17 +238,21 @@ export function createGameState({
 
         clubs: {
             byId: {},
+
             allIds: []
         },
 
         contracts: {
             byId: {},
+
             allIds: [],
+
             activeContractId: null
         },
 
         seasons: {
             byId: {},
+
             allIds: []
         },
 
@@ -246,10 +303,15 @@ export function createGameState({
 
             byGroup: {
                 clubs: 0,
+
                 players: 0,
+
                 agents: 0,
+
                 media: 0,
+
                 fans: 0,
+
                 sponsors: 0
             },
 
@@ -264,7 +326,9 @@ export function createGameState({
 
         career: {
             clubHistory: [],
+
             categoryHistory: [],
+
             positionHistory: [],
 
             milestones: []
@@ -272,6 +336,7 @@ export function createGameState({
 
         world: {
             generatedPeople: [],
+
             generatedPlayers: [],
 
             clubState: {},
