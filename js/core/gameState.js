@@ -7,7 +7,7 @@ import {
 export const GAME_VERSION =
     "0.5.0-alpha";
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 
 function createId(prefix) {
@@ -220,8 +220,26 @@ export function createGameState({
             evaluationStatus:
                 "registered",
 
+            currentEvaluation:
+                null,
+
+            lastDecision:
+                null,
+
             developmentScore:
                 null,
+
+            recognition: 0,
+
+            marketStatus:
+                "not_available",
+
+            freeAgentSinceYear:
+                null,
+
+            offers: [],
+
+            trials: [],
 
             history: []
         },
@@ -328,6 +346,8 @@ export function createGameState({
             clubHistory: [],
 
             categoryHistory: [],
+
+            freeAgentSpells: [],
 
             positionHistory: [],
 

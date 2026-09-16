@@ -18,9 +18,7 @@ import {
 } from "./timelineSystem.js";
 
 
-function average(
-    values
-) {
+function average(values) {
     const validValues =
         values.filter(
             value =>
@@ -50,12 +48,57 @@ function average(
 }
 
 
-function cloneClub(
-    club
-) {
+function cloneClub(club) {
     return JSON.parse(
         JSON.stringify(club)
     );
+}
+
+
+function getCategoryIndex(
+    categoryId
+) {
+    return ACADEMY_CATEGORIES
+        .findIndex(
+            category =>
+                category.id ===
+                categoryId
+        );
+}
+
+
+function closeCurrentClubHistory(
+    gameState,
+    reason
+) {
+    const history =
+        gameState
+            .career
+            .clubHistory;
+
+    const openEntry =
+        [...history]
+            .reverse()
+            .find(
+                entry =>
+                    entry.leftYear ===
+                        null
+            );
+
+    if (!openEntry) {
+        return null;
+    }
+
+    openEntry.leftYear =
+        gameState.calendar.year;
+
+    openEntry.leftAge =
+        gameState.calendar.age;
+
+    openEntry.reasonLeft =
+        reason;
+
+    return openEntry;
 }
 
 
@@ -72,33 +115,33 @@ export function initializeClubWorld(
                 return;
             }
 
-            const runtimeClub =
-                {
-                    ...cloneClub(
-                        clubTemplate
-                    ),
+            const runtimeClub = {
+                ...cloneClub(
+                    clubTemplate
+                ),
 
-                    currentFinances:
-                        clubTemplate
-                            .financialPower,
+                currentFinances:
+                    clubTemplate
+                        .financialPower,
 
-                    academyInvestment:
-                        clubTemplate
-                            .academyQuality,
+                academyInvestment:
+                    clubTemplate
+                        .academyQuality,
 
-                    boardStability: 75,
+                boardStability: 75,
 
-                    currentForm: 50,
+                currentForm: 50,
 
-                    generatedAt:
-                        gameState
-                            .calendar
-                            .year
-                };
+                generatedAt:
+                    gameState
+                        .calendar
+                        .year
+            };
 
             gameState.clubs.byId[
                 runtimeClub.id
-            ] = runtimeClub;
+            ] =
+                runtimeClub;
 
             gameState.clubs.allIds.push(
                 runtimeClub.id
@@ -167,15 +210,26 @@ export function getDefaultCategoryForAge(
 }
 
 
-function categoryIndex(
-    categoryId
+export function getNextCategoryId(
+    currentCategoryId
 ) {
-    return ACADEMY_CATEGORIES
-        .findIndex(
-            category =>
-                category.id ===
-                categoryId
+    const index =
+        getCategoryIndex(
+            currentCategoryId
         );
+
+    if (
+        index < 0 ||
+        index >=
+            ACADEMY_CATEGORIES
+                .length - 1
+    ) {
+        return null;
+    }
+
+    return ACADEMY_CATEGORIES[
+        index + 1
+    ].id;
 }
 
 
@@ -200,7 +254,7 @@ export function findSupportedCategory(
     }
 
     const preferredIndex =
-        categoryIndex(
+        getCategoryIndex(
             preferredCategoryId
         );
 
@@ -209,11 +263,11 @@ export function findSupportedCategory(
             .sort(
                 (a, b) =>
                     Math.abs(
-                        categoryIndex(a) -
+                        getCategoryIndex(a) -
                         preferredIndex
                     ) -
                     Math.abs(
-                        categoryIndex(b) -
+                        getCategoryIndex(b) -
                         preferredIndex
                     )
             );
@@ -418,13 +472,10 @@ function calculateStartingClubWeight(
     }
 
     if (
-        club.level === "large"
+        club.level === "large" &&
+        developmentScore >= 44
     ) {
-        if (
-            developmentScore >= 44
-        ) {
-            weight *= 1.35;
-        }
+        weight *= 1.35;
     }
 
     if (
@@ -521,7 +572,7 @@ export function assignPlayerToClub(
 
     if (!supportedCategory) {
         throw new Error(
-            `${club.name} não possui categoria de base compatível.`
+            `${club.name} não possui categoria compatível.`
         );
     }
 
@@ -530,6 +581,20 @@ export function assignPlayerToClub(
             .player
             .football
             .currentClubId;
+
+    const isClubChange =
+        Boolean(
+            previousClubId &&
+            previousClubId !==
+                club.id
+        );
+
+    if (isClubChange) {
+        closeCurrentClubHistory(
+            gameState,
+            reason
+        );
+    }
 
     const playerCityId =
         gameState
@@ -545,26 +610,22 @@ export function assignPlayerToClub(
                 club.cityId
         );
 
-    gameState
-        .player
+    gameState.player
         .football
         .currentClubId =
         club.id;
 
-    gameState
-        .player
+    gameState.player
         .football
         .currentClubName =
         club.name;
 
-    gameState
-        .player
+    gameState.player
         .football
         .currentCategory =
         supportedCategory;
 
-    gameState
-        .player
+    gameState.player
         .football
         .squadStatus =
         "evaluation";
@@ -609,6 +670,14 @@ export function assignPlayerToClub(
         .evaluationStatus =
         "registered";
 
+    gameState.academy
+        .marketStatus =
+        "not_available";
+
+    gameState.academy
+        .freeAgentSinceYear =
+        null;
+
     gameState.academy.history.push({
         year:
             gameState
@@ -636,35 +705,40 @@ export function assignPlayerToClub(
         relocationRequired
     });
 
-    gameState
-        .career
-        .clubHistory
-        .push({
-            clubId:
-                club.id,
+    if (
+        !previousClubId ||
+        isClubChange
+    ) {
+        gameState
+            .career
+            .clubHistory
+            .push({
+                clubId:
+                    club.id,
 
-            clubName:
-                club.name,
+                clubName:
+                    club.name,
 
-            joinedYear:
-                gameState
-                    .calendar
-                    .year,
+                joinedYear:
+                    gameState
+                        .calendar
+                        .year,
 
-            joinedAge:
-                gameState
-                    .calendar
-                    .age,
+                joinedAge:
+                    gameState
+                        .calendar
+                        .age,
 
-            leftYear: null,
+                leftYear: null,
 
-            leftAge: null,
+                leftAge: null,
 
-            reasonJoined:
-                reason,
+                reasonJoined:
+                    reason,
 
-            reasonLeft: null
-        });
+                reasonLeft: null
+            });
+    }
 
     gameState
         .career
@@ -684,19 +758,21 @@ export function assignPlayerToClub(
             age:
                 gameState
                     .calendar
-                    .age
+                    .age,
+
+            reason
         });
 
     addTimelineEntry(
         gameState,
         {
             type:
-                previousClubId
+                isClubChange
                     ? "club_change"
                     : "academy_joined",
 
             title:
-                previousClubId
+                isClubChange
                     ? `Novo clube: ${club.name}`
                     : `Início no ${club.name}`,
 
@@ -704,7 +780,7 @@ export function assignPlayerToClub(
                 `${gameState.player.identity.fullName} passa a integrar o ${club.name} na categoria ${supportedCategory.toUpperCase()}.`,
 
             importance:
-                previousClubId
+                isClubChange
                     ? 7
                     : 6,
 
@@ -733,6 +809,285 @@ export function assignPlayerToClub(
             supportedCategory,
 
         relocationRequired
+    };
+}
+
+
+export function promotePlayerCategory(
+    gameState,
+    targetCategoryId,
+    {
+        reason =
+            "academy_promotion"
+    } = {}
+) {
+    const club =
+        getClub(
+            gameState,
+            gameState
+                .academy
+                .currentClubId
+        );
+
+    if (!club) {
+        throw new Error(
+            "O jogador está sem clube."
+        );
+    }
+
+    if (
+        !club.academyCategories
+            .includes(
+                targetCategoryId
+            )
+    ) {
+        throw new Error(
+            `${club.name} não possui ${targetCategoryId}.`
+        );
+    }
+
+    const previousCategory =
+        gameState
+            .academy
+            .currentCategory;
+
+    gameState.academy
+        .currentCategory =
+        targetCategoryId;
+
+    gameState.player
+        .football
+        .currentCategory =
+        targetCategoryId;
+
+    gameState.academy.history.push({
+        year:
+            gameState.calendar.year,
+
+        age:
+            gameState.calendar.age,
+
+        clubId:
+            club.id,
+
+        categoryId:
+            targetCategoryId,
+
+        previousCategory,
+
+        action:
+            "category_promotion",
+
+        reason
+    });
+
+    gameState
+        .career
+        .categoryHistory
+        .push({
+            clubId:
+                club.id,
+
+            categoryId:
+                targetCategoryId,
+
+            year:
+                gameState.calendar.year,
+
+            age:
+                gameState.calendar.age,
+
+            reason
+        });
+
+    addTimelineEntry(
+        gameState,
+        {
+            type:
+                "category_promotion",
+
+            title:
+                `Promoção para ${targetCategoryId.toUpperCase()}`,
+
+            description:
+                `${gameState.player.identity.fullName} foi promovido de ${previousCategory?.toUpperCase() ?? "categoria anterior"} para ${targetCategoryId.toUpperCase()} no ${club.name}.`,
+
+            importance: 6,
+
+            relatedEntities: [
+                club.id
+            ],
+
+            metadata: {
+                clubId:
+                    club.id,
+
+                previousCategory,
+
+                targetCategoryId,
+
+                reason
+            }
+        }
+    );
+
+    return targetCategoryId;
+}
+
+
+export function releasePlayerFromClub(
+    gameState,
+    {
+        reason =
+            "academy_release"
+    } = {}
+) {
+    const club =
+        getClub(
+            gameState,
+            gameState
+                .academy
+                .currentClubId
+        );
+
+    if (!club) {
+        return null;
+    }
+
+    const formerClubId =
+        club.id;
+
+    const formerClubName =
+        club.name;
+
+    const formerCategory =
+        gameState
+            .academy
+            .currentCategory;
+
+    closeCurrentClubHistory(
+        gameState,
+        reason
+    );
+
+    gameState.player
+        .football
+        .currentClubId =
+        null;
+
+    gameState.player
+        .football
+        .currentClubName =
+        null;
+
+    gameState.player
+        .football
+        .currentCategory =
+        null;
+
+    gameState.player
+        .football
+        .squadStatus =
+        "unattached";
+
+    gameState.academy
+        .currentClubId =
+        null;
+
+    gameState.academy
+        .currentCategory =
+        null;
+
+    gameState.academy
+        .evaluationStatus =
+        "released";
+
+    gameState.academy
+        .marketStatus =
+        "seeking_club";
+
+    gameState.academy
+        .freeAgentSinceYear =
+        gameState.calendar.year;
+
+    gameState.academy.history.push({
+        year:
+            gameState.calendar.year,
+
+        age:
+            gameState.calendar.age,
+
+        clubId:
+            formerClubId,
+
+        categoryId:
+            formerCategory,
+
+        action:
+            "released",
+
+        reason
+    });
+
+    gameState
+        .career
+        .freeAgentSpells
+        .push({
+            startedYear:
+                gameState.calendar.year,
+
+            startedAge:
+                gameState.calendar.age,
+
+            endedYear: null,
+
+            endedAge: null,
+
+            previousClubId:
+                formerClubId,
+
+            reason
+        });
+
+    addTimelineEntry(
+        gameState,
+        {
+            type:
+                "academy_release",
+
+            title:
+                `Dispensado pelo ${formerClubName}`,
+
+            description:
+                `${gameState.player.identity.fullName} deixou as categorias de base do ${formerClubName}.`,
+
+            importance: 8,
+
+            relatedEntities: [
+                formerClubId
+            ],
+
+            metadata: {
+                clubId:
+                    formerClubId,
+
+                categoryId:
+                    formerCategory,
+
+                reason
+            }
+        }
+    );
+
+    return {
+        clubId:
+            formerClubId,
+
+        clubName:
+            formerClubName,
+
+        categoryId:
+            formerCategory
     };
 }
 
@@ -819,6 +1174,16 @@ export function getCurrentAcademySituation(
             gameState
                 .academy
                 .developmentScore,
+
+        recognition:
+            gameState
+                .academy
+                .recognition,
+
+        marketStatus:
+            gameState
+                .academy
+                .marketStatus,
 
         relocationRequired:
             gameState
