@@ -18,6 +18,10 @@ import {
     renderYearView
 } from "./ui/yearView.js";
 
+import {
+    renderInboxView
+} from "./ui/inboxView.js";
+
 
 function bootstrap() {
     const root =
@@ -42,7 +46,10 @@ function bootstrap() {
                 renderDashboardView,
 
             year:
-                renderYearView
+                renderYearView,
+
+            inbox:
+                renderInboxView
         }
     });
 }

@@ -1,0 +1,214 @@
+.inbox-header {
+    display: grid;
+
+    grid-template-columns:
+        minmax(0, 1fr)
+        auto;
+
+    gap: 24px;
+
+    align-items: start;
+
+    margin-bottom: 34px;
+}
+
+
+.inbox-list {
+    display: grid;
+
+    gap: 14px;
+}
+
+
+.inbox-card {
+    position: relative;
+
+    overflow: hidden;
+
+    padding: 24px;
+
+    border:
+        1px solid
+        var(--border);
+
+    border-radius:
+        var(--radius-md);
+
+    background:
+        var(--surface);
+
+    box-shadow:
+        var(--shadow);
+
+    transition:
+        150ms ease;
+}
+
+
+.inbox-card.unread {
+    border-color:
+        rgba(
+            206,
+            255,
+            61,
+            0.45
+        );
+}
+
+
+.inbox-card.unread::before {
+    position: absolute;
+
+    top: 0;
+    left: 0;
+
+    width: 4px;
+    height: 100%;
+
+    background:
+        var(--accent);
+
+    content: "";
+}
+
+
+.inbox-card.resolved {
+    opacity: 0.62;
+}
+
+
+.inbox-card-top {
+    display: flex;
+
+    align-items:
+        flex-start;
+
+    justify-content:
+        space-between;
+
+    gap: 24px;
+}
+
+
+.inbox-card h2 {
+    margin-bottom: 0;
+
+    font-size:
+        clamp(
+            22px,
+            3vw,
+            30px
+        );
+
+    letter-spacing:
+        -0.025em;
+}
+
+
+.inbox-type {
+    margin-bottom: 7px;
+
+    color:
+        var(--accent);
+
+    font-size: 10px;
+    font-weight: 900;
+
+    letter-spacing:
+        0.16em;
+
+    text-transform:
+        uppercase;
+}
+
+
+.inbox-date {
+    flex: 0 0 auto;
+
+    color:
+        var(--text-muted);
+
+    font-size: 12px;
+    font-weight: 800;
+}
+
+
+.inbox-body {
+    max-width: 800px;
+
+    margin:
+        18px 0
+        0;
+
+    color:
+        var(--text-soft);
+}
+
+
+.inbox-actions {
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap: 9px;
+
+    margin-top: 22px;
+
+    padding-top: 18px;
+
+    border-top:
+        1px solid
+        var(--border);
+}
+
+
+.inbox-resolution {
+    display: inline-flex;
+
+    margin-top: 20px;
+
+    padding:
+        7px 11px;
+
+    border:
+        1px solid
+        var(--border);
+
+    border-radius:
+        999px;
+
+    color:
+        var(--text-soft);
+
+    font-size: 12px;
+    font-weight: 800;
+}
+
+
+@media (
+    max-width: 720px
+) {
+    .inbox-header {
+        grid-template-columns:
+            1fr;
+    }
+
+
+    .inbox-card-top {
+        flex-direction:
+            column;
+    }
+
+
+    .inbox-actions {
+        display: grid;
+
+        grid-template-columns:
+            1fr;
+    }
+
+
+    .inbox-actions .btn {
+        width: 100%;
+    }
+}

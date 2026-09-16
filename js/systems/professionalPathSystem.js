@@ -184,20 +184,29 @@ export function calculateProfessionalReadiness(
 export function canTrainWithFirstTeam(
     gameState
 ) {
+    if (
+        !gameState.player
+            .football
+            .currentClubId
+    ) {
+        return false;
+    }
+
+    if (
+        gameState.calendar.age <
+        15
+    ) {
+        return false;
+    }
+
     const readiness =
         calculateProfessionalReadiness(
             gameState
         );
 
     return (
-        gameState.calendar.age >=
-            15 &&
-        Boolean(
-            gameState.player
-                .football
-                .currentClubId
-        ) &&
-        readiness >= 48
+        readiness >=
+        48
     );
 }
 
@@ -205,6 +214,17 @@ export function canTrainWithFirstTeam(
 export function grantFirstTeamTraining(
     gameState
 ) {
+    const clubId =
+        gameState.player
+            .football
+            .currentClubId;
+
+    if (!clubId) {
+        throw new Error(
+            "Não existe clube atual para realizar treinamento com o elenco profissional."
+        );
+    }
+
     if (
         gameState.professional
             .firstTeamTrainingYear !==
@@ -220,14 +240,12 @@ export function grantFirstTeamTraining(
     const club =
         getClub(
             gameState,
-            gameState.player
-                .football
-                .currentClubId
+            clubId
         );
 
     if (!club) {
         throw new Error(
-            "Jogador sem clube."
+            "Clube atual não encontrado."
         );
     }
 
@@ -265,7 +283,10 @@ export function grantFirstTeamTraining(
                 gameState.calendar.year,
 
             age:
-                gameState.calendar.age
+                gameState.calendar.age,
+
+            clubId:
+                club.id
         });
 
     addCareerMilestone(
@@ -310,6 +331,17 @@ export function grantFirstTeamCallUp(
             "Adversário"
     } = {}
 ) {
+    const clubId =
+        gameState.player
+            .football
+            .currentClubId;
+
+    if (!clubId) {
+        throw new Error(
+            "O jogador precisa estar vinculado a um clube."
+        );
+    }
+
     if (
         !gameState.player
             .football
@@ -331,9 +363,7 @@ export function grantFirstTeamCallUp(
     const club =
         getClub(
             gameState,
-            gameState.player
-                .football
-                .currentClubId
+            clubId
         );
 
     const callUp = {
@@ -345,7 +375,9 @@ export function grantFirstTeamCallUp(
 
         competition,
 
-        opponent
+        opponent,
+
+        clubId
     };
 
     gameState.professional
@@ -418,6 +450,16 @@ export function recordFirstProfessionalBench(
             "Adversário"
     } = {}
 ) {
+    if (
+        !gameState.player
+            .football
+            .currentClubId
+    ) {
+        throw new Error(
+            "O jogador está sem clube."
+        );
+    }
+
     if (
         !gameState.professional
             .firstCallUp
@@ -514,6 +556,16 @@ export function recordProfessionalDebut(
         result = null
     } = {}
 ) {
+    if (
+        !gameState.player
+            .football
+            .currentClubId
+    ) {
+        throw new Error(
+            "O jogador está sem clube."
+        );
+    }
+
     if (
         !gameState.player
             .football
@@ -652,6 +704,16 @@ export function recordFirstProfessionalStart(
     } = {}
 ) {
     if (
+        !gameState.player
+            .football
+            .currentClubId
+    ) {
+        throw new Error(
+            "O jogador está sem clube."
+        );
+    }
+
+    if (
         !gameState.professional
             .debut
     ) {
@@ -750,6 +812,16 @@ export function recordFirstProfessionalGoal(
     } = {}
 ) {
     if (
+        !gameState.player
+            .football
+            .currentClubId
+    ) {
+        throw new Error(
+            "O jogador está sem clube."
+        );
+    }
+
+    if (
         !gameState.professional
             .debut
     ) {
@@ -838,6 +910,23 @@ export function recordFirstProfessionalGoal(
 export function getNextProfessionalMilestone(
     gameState
 ) {
+    /*
+     * REGRA FUNDAMENTAL:
+     *
+     * Sem clube, nenhum marco de
+     * primeiro time pode acontecer.
+     *
+     * Foi exatamente isso que causou
+     * o travamento encontrado no teste.
+     */
+    if (
+        !gameState.player
+            .football
+            .currentClubId
+    ) {
+        return null;
+    }
+
     const readiness =
         calculateProfessionalReadiness(
             gameState
@@ -846,9 +935,9 @@ export function getNextProfessionalMilestone(
     if (
         !gameState.professional
             .firstTeamTrainingYear &&
-        gameState.calendar.age >=
-            15 &&
-        readiness >= 48
+        canTrainWithFirstTeam(
+            gameState
+        )
     ) {
         return "first_team_training";
     }

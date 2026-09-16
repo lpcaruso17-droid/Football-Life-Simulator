@@ -7,6 +7,54 @@ import {
 } from "../systems/timelineSystem.js";
 
 
+const RECENT_EVENT_LIMIT = 5;
+
+
+function ensureEventMemory(
+    gameState
+) {
+    if (
+        !gameState.eventState
+    ) {
+        gameState.eventState = {
+            completed: [],
+            cooldowns: {},
+            activeChains: {},
+            completedChains: [],
+            flags: {}
+        };
+    }
+
+    if (
+        !Array.isArray(
+            gameState.eventState
+                .completed
+        )
+    ) {
+        gameState.eventState
+            .completed = [];
+    }
+
+    if (
+        !gameState.eventState
+            .cooldowns
+    ) {
+        gameState.eventState
+            .cooldowns = {};
+    }
+
+    if (
+        !Array.isArray(
+            gameState.eventState
+                .recentEvents
+        )
+    ) {
+        gameState.eventState
+            .recentEvents = [];
+    }
+}
+
+
 function isOnCooldown(
     gameState,
     event
@@ -68,87 +116,178 @@ function buildEvent(
 }
 
 
+function filterRecentEvents(
+    gameState,
+    events
+) {
+    const recent =
+        gameState.eventState
+            .recentEvents ??
+        [];
+
+    const freshEvents =
+        events.filter(
+            event =>
+                !recent.includes(
+                    event.id
+                )
+        );
+
+    /*
+     * Só bloqueamos eventos recentes
+     * quando existe alternativa.
+     *
+     * Assim evitamos repetição,
+     * mas também evitamos ficar
+     * sem nenhum evento possível.
+     */
+    return freshEvents.length
+        ? freshEvents
+        : events;
+}
+
+
+function rememberEvent(
+    gameState,
+    eventId
+) {
+    ensureEventMemory(
+        gameState
+    );
+
+    const recent =
+        gameState.eventState
+            .recentEvents;
+
+    const existingIndex =
+        recent.indexOf(
+            eventId
+        );
+
+    if (existingIndex >= 0) {
+        recent.splice(
+            existingIndex,
+            1
+        );
+    }
+
+    recent.push(
+        eventId
+    );
+
+    while (
+        recent.length >
+        RECENT_EVENT_LIMIT
+    ) {
+        recent.shift();
+    }
+}
+
+
 export function getEligibleEvents(
     gameState,
     eventDefinitions
 ) {
-    return (
-        eventDefinitions ?? []
-    )
-        .map(
-            definition =>
-                buildEvent(
-                    gameState,
-                    definition
-                )
+    ensureEventMemory(
+        gameState
+    );
+
+    const eligible =
+        (
+            eventDefinitions ??
+            []
         )
-        .filter(Boolean)
-        .filter(
-            event => {
-                const age =
-                    gameState.calendar.age;
-
-                if (
-                    event.minAge !==
-                        undefined &&
-                    age <
-                        event.minAge
-                ) {
-                    return false;
-                }
-
-                if (
-                    event.maxAge !==
-                        undefined &&
-                    age >
-                        event.maxAge
-                ) {
-                    return false;
-                }
-
-                if (
-                    Array.isArray(
-                        event.phases
-                    ) &&
-                    !event.phases.includes(
-                        gameState.calendar
-                            .phase
-                    )
-                ) {
-                    return false;
-                }
-
-                if (
-                    isCompletedOnceOnly(
+            .map(
+                definition =>
+                    buildEvent(
                         gameState,
-                        event
+                        definition
                     )
-                ) {
-                    return false;
-                }
+            )
+            .filter(Boolean)
+            .filter(
+                event => {
+                    const age =
+                        gameState.calendar.age;
 
-                if (
-                    isOnCooldown(
-                        gameState,
-                        event
-                    )
-                ) {
-                    return false;
-                }
+                    if (
+                        event.minAge !==
+                            undefined &&
+                        age <
+                            event.minAge
+                    ) {
+                        return false;
+                    }
 
-                if (
-                    typeof event.canTrigger ===
-                        "function" &&
-                    !event.canTrigger(
-                        gameState
-                    )
-                ) {
-                    return false;
-                }
+                    if (
+                        event.maxAge !==
+                            undefined &&
+                        age >
+                            event.maxAge
+                    ) {
+                        return false;
+                    }
 
-                return true;
-            }
-        );
+                    if (
+                        Array.isArray(
+                            event.phases
+                        ) &&
+                        !event.phases
+                            .includes(
+                                gameState
+                                    .calendar
+                                    .phase
+                            )
+                    ) {
+                        return false;
+                    }
+
+                    if (
+                        isCompletedOnceOnly(
+                            gameState,
+                            event
+                        )
+                    ) {
+                        return false;
+                    }
+
+                    if (
+                        isOnCooldown(
+                            gameState,
+                            event
+                        )
+                    ) {
+                        return false;
+                    }
+
+                    if (
+                        typeof event.canTrigger ===
+                            "function" &&
+                        !event.canTrigger(
+                            gameState
+                        )
+                    ) {
+                        return false;
+                    }
+
+                    if (
+                        !Array.isArray(
+                            event.choices
+                        ) ||
+                        !event.choices
+                            .length
+                    ) {
+                        return false;
+                    }
+
+                    return true;
+                }
+            );
+
+    return filterRecentEvents(
+        gameState,
+        eligible
+    );
 }
 
 
@@ -182,6 +321,10 @@ export function resolveEventChoice(
     event,
     choiceId
 ) {
+    ensureEventMemory(
+        gameState
+    );
+
     if (!event) {
         throw new Error(
             "Evento inválido."
@@ -204,6 +347,14 @@ export function resolveEventChoice(
 
     let result = null;
 
+    /*
+     * O efeito da decisão acontece
+     * antes de marcarmos o evento
+     * como concluído.
+     *
+     * Se o efeito falhar, o jogo
+     * não grava uma decisão inválida.
+     */
     if (
         typeof choice.apply ===
         "function"
@@ -236,6 +387,11 @@ export function resolveEventChoice(
             );
     }
 
+    rememberEvent(
+        gameState,
+        event.id
+    );
+
     addTimelineEntry(
         gameState,
         {
@@ -250,7 +406,8 @@ export function resolveEventChoice(
                 `Decisão tomada: ${choice.label}.`,
 
             importance:
-                event.importance ?? 4,
+                event.importance ??
+                4,
 
             relatedEntities:
                 event.relatedEntities ??

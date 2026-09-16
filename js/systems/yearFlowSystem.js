@@ -25,6 +25,14 @@ import {
 } from "../events/friends.js";
 
 import {
+    FAMILY_EVENTS
+} from "../events/family.js";
+
+import {
+    CAREER_EVENTS
+} from "../events/career.js";
+
+import {
     PROFESSIONAL_EVENTS
 } from "../events/professional.js";
 
@@ -45,15 +53,15 @@ import {
 } from "./timelineSystem.js";
 
 
+const runtimeFlows =
+    new Map();
+
+
 function createRuntimeKey(
     gameState
 ) {
     return gameState.save.id;
 }
-
-
-const runtimeFlows =
-    new Map();
 
 
 function createRuntimeFlow(
@@ -126,30 +134,10 @@ function getOrCreateRuntimeFlow(
 function getGeneralEventPool() {
     return [
         ...EDUCATION_EVENTS,
-        ...FRIEND_EVENTS
+        ...FRIEND_EVENTS,
+        ...FAMILY_EVENTS,
+        ...CAREER_EVENTS
     ];
-}
-
-
-function getProfessionalMilestoneEvents(
-    gameState
-) {
-    return PROFESSIONAL_EVENTS
-        .map(
-            definition =>
-                typeof definition ===
-                    "function"
-                    ? definition(
-                        gameState
-                    )
-                    : definition
-        )
-        .filter(Boolean)
-        .filter(
-            event =>
-                event.category ===
-                    "professional"
-        );
 }
 
 
@@ -169,9 +157,71 @@ function findForcedHousingEvent(
 }
 
 
+function chooseClublessEvent(
+    gameState
+) {
+    const clublessCareerEvents =
+        CAREER_EVENTS.filter(
+            definition => {
+                const event =
+                    typeof definition ===
+                        "function"
+                        ? definition(
+                            gameState
+                        )
+                        : definition;
+
+                return Boolean(
+                    event
+                );
+            }
+        );
+
+    return drawEvent(
+        gameState,
+        clublessCareerEvents
+    );
+}
+
+
+function getProfessionalMilestoneEvents(
+    gameState
+) {
+    if (
+        !gameState.player
+            .football
+            .currentClubId
+    ) {
+        return [];
+    }
+
+    return PROFESSIONAL_EVENTS
+        .map(
+            definition =>
+                typeof definition ===
+                    "function"
+                    ? definition(
+                        gameState
+                    )
+                    : definition
+        )
+        .filter(Boolean)
+        .filter(
+            event =>
+                event.category ===
+                "professional"
+        );
+}
+
+
 function choosePhaseEvent(
     gameState
 ) {
+    /*
+     * Mudança de cidade é uma
+     * decisão estrutural e tem
+     * prioridade.
+     */
     const housingEvent =
         findForcedHousingEvent(
             gameState
@@ -180,6 +230,29 @@ function choosePhaseEvent(
     if (housingEvent) {
         return housingEvent;
     }
+
+
+    /*
+     * Sem clube, o futebol precisa
+     * reagir ao desemprego do atleta
+     * antes de tentar gerar marcos
+     * profissionais impossíveis.
+     */
+    if (
+        !gameState.player
+            .football
+            .currentClubId
+    ) {
+        const clublessEvent =
+            chooseClublessEvent(
+                gameState
+            );
+
+        if (clublessEvent) {
+            return clublessEvent;
+        }
+    }
+
 
     const professionalEvents =
         getProfessionalMilestoneEvents(
@@ -200,6 +273,7 @@ function choosePhaseEvent(
         }
     }
 
+
     return drawEvent(
         gameState,
         getGeneralEventPool()
@@ -214,19 +288,32 @@ function shouldHaveLifeEvent(
     const age =
         gameState.calendar.age;
 
-    const basePattern = [
+    /*
+     * Todo ano tem pelo menos:
+     * pré-temporada,
+     * meio do ano,
+     * fim da temporada.
+     *
+     * A adolescência ganha
+     * mais acontecimentos.
+     */
+    const pattern = [
         true,
-        age >= 11,
+
+        age >= 12,
+
         true,
-        age >= 13,
+
+        age >= 15,
+
         true
     ];
 
     return (
-        basePattern[
+        pattern[
             phaseIndex
         ] ??
-        true
+        false
     );
 }
 
@@ -290,6 +377,10 @@ function finalizeYear(
         null;
 
 
+    /*
+     * Sem clube, simplesmente não
+     * existe temporada oficial.
+     */
     if (
         gameState.player
             .football
@@ -351,7 +442,11 @@ function finalizeYear(
                 `Fim de ${gameState.calendar.year}`,
 
             description:
-                `${gameState.player.identity.fullName} encerrou mais um ano de sua história.`,
+                gameState.player
+                    .football
+                    .currentClubId
+                    ? `${gameState.player.identity.fullName} encerrou mais um ano de sua história.`
+                    : `${gameState.player.identity.fullName} encerrou o ano ainda buscando uma nova oportunidade no futebol.`,
 
             importance: 4,
 
@@ -360,7 +455,14 @@ function finalizeYear(
                     gameState.calendar.year,
 
                 age:
-                    gameState.calendar.age
+                    gameState.calendar.age,
+
+                hadClub:
+                    Boolean(
+                        gameState.player
+                            .football
+                            .currentClubId
+                    )
             }
         }
     );
@@ -425,6 +527,13 @@ export function getNextYearStep(
     }
 
 
+    /*
+     * Evento já apresentado e ainda
+     * não resolvido.
+     *
+     * Sair da tela e voltar NÃO
+     * rerrola o acontecimento.
+     */
     if (
         flow.currentEvent &&
         !flow

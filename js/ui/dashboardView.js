@@ -38,6 +38,11 @@ import {
 } from "../systems/educationSystem.js";
 
 import {
+    refreshInboxOpportunities,
+    getPendingInboxCount
+} from "../systems/inboxSystem.js";
+
+import {
     navigateTo
 } from "./router.js";
 
@@ -218,13 +223,21 @@ function renderFamilyMember(
         <div class="person-row">
             <div class="person-main">
                 <div class="person-name">
-                    ${escapeHtml(person.identity.fullName)}
+                    ${escapeHtml(
+                        person.identity
+                            .fullName
+                    )}
                 </div>
 
                 <div class="person-role">
                     ${escapeHtml(label)}
+
                     ·
-                    ${escapeHtml(person.profession ?? "—")}
+
+                    ${escapeHtml(
+                        person.profession ??
+                        "—"
+                    )}
                 </div>
             </div>
 
@@ -282,18 +295,28 @@ function renderTimeline(
                 <div class="timeline-row">
                     <div>
                         <strong>
-                            ${escapeHtml(entry.title)}
+                            ${escapeHtml(
+                                entry.title
+                            )}
                         </strong>
 
                         <div class="timeline-description">
-                            ${escapeHtml(entry.description)}
+                            ${escapeHtml(
+                                entry.description
+                            )}
                         </div>
                     </div>
 
                     <div class="timeline-date">
-                        ${escapeHtml(entry.year)}
+                        ${escapeHtml(
+                            entry.year
+                        )}
+
                         ·
-                        ${escapeHtml(entry.age)}
+
+                        ${escapeHtml(
+                            entry.age
+                        )}
                         anos
                     </div>
                 </div>
@@ -346,15 +369,21 @@ function renderContract(
                 class="muted"
                 style="margin-top: 6px;"
             >
-                ${escapeHtml(contract.clubName)}
+                ${escapeHtml(
+                    contract.clubName
+                )}
 
                 ·
 
-                ${money(income)} / mês
+                ${money(income)}
+                / mês
 
                 ·
 
-                até ${escapeHtml(contract.endYear)}
+                até
+                ${escapeHtml(
+                    contract.endYear
+                )}
 
                 ·
 
@@ -382,6 +411,31 @@ export function renderDashboardView(
 
         return;
     }
+
+
+    const inboxRefresh =
+        refreshInboxOpportunities(
+            game
+        );
+
+    if (
+        inboxRefresh.createdMessages >
+        0
+    ) {
+        saveGame(
+            game,
+            {
+                reason:
+                    "dashboard_opportunities_refresh"
+            }
+        );
+    }
+
+
+    const pendingInbox =
+        getPendingInboxCount(
+            game
+        );
 
 
     const player =
@@ -471,7 +525,10 @@ export function renderDashboardView(
                     </h1>
 
                     <div class="player-subtitle">
-                        ${escapeHtml(city?.name ?? "Cidade não definida")}
+                        ${escapeHtml(
+                            city?.name ??
+                            "Cidade não definida"
+                        )}
 
                         ·
 
@@ -484,7 +541,9 @@ export function renderDashboardView(
                         ${
                             player.football
                                 .currentCategory
-                                ? ` · ${escapeHtml(category)}`
+                                ? ` · ${escapeHtml(
+                                    category
+                                )}`
                                 : ""
                         }
                     </div>
@@ -510,6 +569,19 @@ export function renderDashboardView(
                     type="button"
                 >
                     VIVER O ANO
+                </button>
+
+                <button
+                    id="open-inbox"
+                    class="btn"
+                    type="button"
+                >
+                    CAIXA DE ENTRADA
+                    ${
+                        pendingInbox > 0
+                            ? `(${pendingInbox})`
+                            : ""
+                    }
                 </button>
 
                 <button
@@ -644,7 +716,9 @@ export function renderDashboardView(
                             </div>
 
                             <div class="info-item-value">
-                                ${escapeHtml(category)}
+                                ${escapeHtml(
+                                    category
+                                )}
                             </div>
                         </div>
 
@@ -787,7 +861,9 @@ export function renderDashboardView(
                                         </div>
 
                                         <div class="info-item-value">
-                                            ${escapeHtml(season.appearances)}
+                                            ${escapeHtml(
+                                                season.appearances
+                                            )}
                                         </div>
                                     </div>
 
@@ -797,7 +873,9 @@ export function renderDashboardView(
                                         </div>
 
                                         <div class="info-item-value">
-                                            ${escapeHtml(season.starts)}
+                                            ${escapeHtml(
+                                                season.starts
+                                            )}
                                         </div>
                                     </div>
 
@@ -807,7 +885,9 @@ export function renderDashboardView(
                                         </div>
 
                                         <div class="info-item-value">
-                                            ${escapeHtml(season.minutes)}
+                                            ${escapeHtml(
+                                                season.minutes
+                                            )}
                                         </div>
                                     </div>
 
@@ -817,7 +897,9 @@ export function renderDashboardView(
                                         </div>
 
                                         <div class="info-item-value">
-                                            ${escapeHtml(season.averageRating)}
+                                            ${escapeHtml(
+                                                season.averageRating
+                                            )}
                                         </div>
                                     </div>
 
@@ -827,7 +909,9 @@ export function renderDashboardView(
                                         </div>
 
                                         <div class="info-item-value">
-                                            ${escapeHtml(season.goals)}
+                                            ${escapeHtml(
+                                                season.goals
+                                            )}
                                         </div>
                                     </div>
 
@@ -837,7 +921,9 @@ export function renderDashboardView(
                                         </div>
 
                                         <div class="info-item-value">
-                                            ${escapeHtml(season.assists)}
+                                            ${escapeHtml(
+                                                season.assists
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -875,7 +961,9 @@ export function renderDashboardView(
                                 </div>
 
                                 <div class="info-item-value">
-                                    ${escapeHtml(agency.name)}
+                                    ${escapeHtml(
+                                        agency.name
+                                    )}
                                 </div>
 
                                 <div
@@ -942,6 +1030,28 @@ export function renderDashboardView(
 
                 navigateTo(
                     "year"
+                );
+            }
+        );
+
+
+    root
+        .querySelector(
+            "#open-inbox"
+        )
+        ?.addEventListener(
+            "click",
+            () => {
+                saveGame(
+                    game,
+                    {
+                        reason:
+                            "before_inbox"
+                    }
+                );
+
+                navigateTo(
+                    "inbox"
                 );
             }
         );
