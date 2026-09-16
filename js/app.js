@@ -14,6 +14,10 @@ import {
     renderDashboardView
 } from "./ui/dashboardView.js";
 
+import {
+    renderYearView
+} from "./ui/yearView.js";
+
 
 function bootstrap() {
     const root =
@@ -35,7 +39,10 @@ function bootstrap() {
                 renderCreationView,
 
             dashboard:
-                renderDashboardView
+                renderDashboardView,
+
+            year:
+                renderYearView
         }
     });
 }

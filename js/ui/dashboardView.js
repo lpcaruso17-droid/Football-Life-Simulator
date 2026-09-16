@@ -114,6 +114,31 @@ function categoryLabel(
 }
 
 
+function positionLabel(
+    positionId
+) {
+    const labels = {
+        gk: "Goleiro",
+        rb: "Lateral-direito",
+        cb: "Zagueiro",
+        lb: "Lateral-esquerdo",
+        dm: "Volante",
+        cm: "Meio-campista",
+        rw: "Ponta-direita",
+        lw: "Ponta-esquerda",
+        st: "Centroavante"
+    };
+
+    return (
+        labels[
+            positionId
+        ] ??
+        positionId ??
+        "—"
+    );
+}
+
+
 function squadStatusLabel(
     status
 ) {
@@ -268,7 +293,8 @@ function renderTimeline(
                     <div class="timeline-date">
                         ${escapeHtml(entry.year)}
                         ·
-                        ${escapeHtml(entry.age)} anos
+                        ${escapeHtml(entry.age)}
+                        anos
                     </div>
                 </div>
             `
@@ -479,8 +505,16 @@ export function renderDashboardView(
 
             <div class="dashboard-toolbar">
                 <button
-                    id="save-now"
+                    id="live-year"
                     class="btn btn-primary"
+                    type="button"
+                >
+                    VIVER O ANO
+                </button>
+
+                <button
+                    id="save-now"
+                    class="btn"
                     type="button"
                 >
                     Salvar agora
@@ -488,7 +522,7 @@ export function renderDashboardView(
 
                 <button
                     id="go-home"
-                    class="btn"
+                    class="btn btn-ghost"
                     type="button"
                 >
                     Meus saves
@@ -621,9 +655,10 @@ export function renderDashboardView(
 
                             <div class="info-item-value">
                                 ${escapeHtml(
-                                    player.football
-                                        .position ??
-                                    "—"
+                                    positionLabel(
+                                        player.football
+                                            .position
+                                    )
                                 )}
                             </div>
                         </div>
@@ -822,9 +857,7 @@ export function renderDashboardView(
 
                     <div class="people-list">
                         ${fatherHtml}
-
                         ${motherHtml}
-
                         ${siblingHtml}
                     </div>
                 </section>
@@ -887,21 +920,31 @@ export function renderDashboardView(
                         ${renderTimeline(game)}
                     </div>
                 </section>
-
-                <section class="dashboard-panel dashboard-panel-wide">
-                    <div class="dev-note">
-                        A estrutura visual da V0.5 já está
-                        conectada ao novo Core.
-
-                        No próximo bloco, o botão
-                        <strong>Viver o ano</strong>
-                        será ligado ao motor de temporada,
-                        eventos, escolhas e progressão temporal.
-                    </div>
-                </section>
             </div>
         </main>
     `;
+
+
+    root
+        .querySelector(
+            "#live-year"
+        )
+        ?.addEventListener(
+            "click",
+            () => {
+                saveGame(
+                    game,
+                    {
+                        reason:
+                            "before_year_flow"
+                    }
+                );
+
+                navigateTo(
+                    "year"
+                );
+            }
+        );
 
 
     root

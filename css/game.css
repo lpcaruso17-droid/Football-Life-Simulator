@@ -515,10 +515,236 @@
 }
 
 
+/* YEAR FLOW */
+
+.year-progress {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            5,
+            minmax(0, 1fr)
+        );
+
+    gap: 8px;
+
+    margin:
+        34px 0
+        24px;
+}
+
+
+.year-progress-step {
+    position: relative;
+
+    min-height: 78px;
+
+    padding: 12px;
+
+    border:
+        1px solid
+        var(--border);
+
+    border-radius:
+        10px;
+
+    background:
+        var(--surface);
+
+    color:
+        var(--text-muted);
+}
+
+
+.year-progress-step span {
+    display: grid;
+
+    width: 25px;
+    height: 25px;
+
+    place-items: center;
+
+    margin-bottom: 8px;
+
+    border-radius: 50%;
+
+    background:
+        var(--surface-strong);
+
+    font-size: 11px;
+    font-weight: 900;
+}
+
+
+.year-progress-step small {
+    font-size: 11px;
+
+    font-weight: 800;
+}
+
+
+.year-progress-step.completed {
+    border-color:
+        rgba(206, 255, 61, 0.22);
+
+    color:
+        var(--text-soft);
+}
+
+
+.year-progress-step.completed span {
+    background:
+        var(--accent-soft);
+
+    color:
+        var(--accent);
+}
+
+
+.year-progress-step.active {
+    border-color:
+        var(--accent);
+
+    background:
+        var(--accent-soft);
+
+    color:
+        var(--text);
+}
+
+
+.year-progress-step.active span {
+    background:
+        var(--accent);
+
+    color:
+        #050705;
+}
+
+
+.year-event-card {
+    max-width: 900px;
+
+    padding: 26px;
+
+    border:
+        1px solid
+        var(--border);
+
+    border-radius:
+        var(--radius-lg);
+
+    background:
+        var(--surface);
+
+    box-shadow:
+        var(--shadow);
+}
+
+
+.year-event-meta {
+    margin-bottom: 18px;
+
+    color:
+        var(--text-muted);
+
+    font-size: 12px;
+    font-weight: 900;
+
+    letter-spacing: 0.12em;
+
+    text-transform: uppercase;
+}
+
+
+.year-event-choices {
+    display: grid;
+
+    gap: 12px;
+}
+
+
+.year-choice {
+    display: flex;
+
+    width: 100%;
+
+    align-items: center;
+
+    justify-content:
+        space-between;
+
+    gap: 20px;
+
+    padding: 18px;
+
+    border:
+        1px solid
+        var(--border);
+
+    border-radius:
+        12px;
+
+    background:
+        var(--bg-soft);
+
+    color:
+        var(--text);
+
+    text-align: left;
+
+    transition:
+        150ms ease;
+}
+
+
+.year-choice:hover {
+    border-color:
+        var(--accent);
+
+    background:
+        var(--accent-soft);
+
+    transform:
+        translateX(3px);
+}
+
+
+.year-choice strong {
+    font-size: 16px;
+}
+
+
+.year-choice span {
+    color:
+        var(--text-muted);
+
+    font-size: 12px;
+}
+
+
+.year-summary-grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            6,
+            minmax(0, 1fr)
+        );
+
+    gap: 10px;
+
+    margin-top: 30px;
+}
+
+
+/* RESPONSIVE */
+
 @media (
     max-width: 1000px
 ) {
-    .dashboard-stats {
+    .dashboard-stats,
+    .year-summary-grid {
         grid-template-columns:
             repeat(
                 3,
@@ -559,7 +785,8 @@
     }
 
 
-    .dashboard-stats {
+    .dashboard-stats,
+    .year-summary-grid {
         grid-template-columns:
             repeat(
                 2,
@@ -581,13 +808,33 @@
     .info-grid {
         grid-template-columns: 1fr;
     }
+
+
+    .year-progress {
+        grid-template-columns: 1fr;
+    }
+
+
+    .year-progress-step {
+        min-height: auto;
+    }
+
+
+    .year-choice {
+        align-items:
+            flex-start;
+
+        flex-direction:
+            column;
+    }
 }
 
 
 @media (
     max-width: 460px
 ) {
-    .dashboard-stats {
+    .dashboard-stats,
+    .year-summary-grid {
         grid-template-columns: 1fr;
     }
 

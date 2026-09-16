@@ -1,8 +1,3 @@
-import {
-    addTimelineEntry
-} from "../systems/timelineSystem.js";
-
-
 export const YEAR_PHASES = [
     "preseason",
     "early_season",
@@ -12,19 +7,46 @@ export const YEAR_PHASES = [
 ];
 
 
+export const PHASE_LABELS = {
+    preseason:
+        "Pré-temporada",
+
+    early_season:
+        "Início da temporada",
+
+    mid_season:
+        "Meio da temporada",
+
+    late_season:
+        "Reta final",
+
+    offseason:
+        "Fim de temporada"
+};
+
+
 export function getCurrentPhase(
     gameState
 ) {
     return (
-        gameState
-            .calendar
-            ?.phase ??
-        "preseason"
+        gameState.calendar
+            .phase ??
+        YEAR_PHASES[0]
     );
 }
 
 
-export function setYearPhase(
+export function getPhaseLabel(
+    phase
+) {
+    return (
+        PHASE_LABELS[phase] ??
+        phase
+    );
+}
+
+
+export function setPhase(
     gameState,
     phase
 ) {
@@ -34,7 +56,7 @@ export function setYearPhase(
         )
     ) {
         throw new Error(
-            `Fase do ano inválida: ${phase}`
+            `Fase inválida: ${phase}`
         );
     }
 
@@ -48,173 +70,85 @@ export function setYearPhase(
 export function beginYear(
     gameState
 ) {
-    gameState
-        .calendar
-        .seasonStarted = true;
+    gameState.calendar.phase =
+        "preseason";
 
-    gameState
-        .calendar
-        .seasonCompleted = false;
+    gameState.calendar
+        .seasonStarted =
+        true;
 
-    setYearPhase(
-        gameState,
-        "preseason"
-    );
+    gameState.calendar
+        .seasonCompleted =
+        false;
 
-    addTimelineEntry(
-        gameState,
-        {
-            type:
-                "year_started",
-
-            title:
-                `Início dos ${gameState.calendar.age} anos`,
-
-            description:
-                `Começou o ano de ${gameState.calendar.year}.`,
-
-            importance: 2
-        }
-    );
-
-    return gameState;
+    return gameState.calendar;
 }
 
 
 export function advancePhase(
     gameState
 ) {
-    const currentPhase =
-        getCurrentPhase(
-            gameState
-        );
-
     const currentIndex =
         YEAR_PHASES.indexOf(
-            currentPhase
+            gameState.calendar.phase
         );
 
     if (
-        currentIndex ===
-        -1
+        currentIndex < 0
     ) {
-        setYearPhase(
-            gameState,
-            YEAR_PHASES[0]
-        );
+        gameState.calendar.phase =
+            YEAR_PHASES[0];
 
-        return YEAR_PHASES[0];
+        return gameState.calendar.phase;
     }
 
     if (
-        currentIndex ===
+        currentIndex >=
         YEAR_PHASES.length - 1
     ) {
         return null;
     }
 
-    const nextPhase =
+    gameState.calendar.phase =
         YEAR_PHASES[
             currentIndex + 1
         ];
 
-    setYearPhase(
-        gameState,
-        nextPhase
-    );
-
-    return nextPhase;
+    return gameState.calendar.phase;
 }
 
 
 export function completeYear(
     gameState
 ) {
-    gameState
-        .calendar
-        .seasonCompleted = true;
+    gameState.calendar
+        .seasonCompleted =
+        true;
 
-    setYearPhase(
-        gameState,
-        "offseason"
-    );
-
-    addTimelineEntry(
-        gameState,
-        {
-            type:
-                "year_completed",
-
-            title:
-                `Fim dos ${gameState.calendar.age} anos`,
-
-            description:
-                `O ano de ${gameState.calendar.year} chegou ao fim.`,
-
-            importance: 3
-        }
-    );
-
-    return gameState;
-}
-
-
-export function advanceToNextYear(
-    gameState
-) {
-    if (
-        !gameState
-            .calendar
-            .seasonCompleted
-    ) {
-        throw new Error(
-            "O ano atual precisa ser concluído antes de avançar."
-        );
-    }
-
-    gameState.calendar.year += 1;
-    gameState.calendar.age += 1;
-
-    gameState
-        .calendar
-        .seasonStarted = false;
-
-    gameState
-        .calendar
-        .seasonCompleted = false;
-
-    setYearPhase(
-        gameState,
-        "preseason"
-    );
-
-    addTimelineEntry(
-        gameState,
-        {
-            type:
-                "birthday",
-
-            title:
-                `${gameState.calendar.age} anos`,
-
-            description:
-                `O personagem completou ${gameState.calendar.age} anos.`,
-
-            importance: 3
-        }
-    );
-
-    return gameState;
+    return gameState.calendar;
 }
 
 
 export function calculateAge(
-    birthYear,
-    currentYear
+    gameState,
+    year =
+        gameState.calendar.year
 ) {
-    return Math.max(
-        0,
-        Number(currentYear) -
+    const birthYear =
+        gameState.player
+            .identity
+            .birthYear;
+
+    if (
+        !Number.isFinite(
+            Number(birthYear)
+        )
+    ) {
+        return gameState.calendar.age;
+    }
+
+    return (
+        Number(year) -
         Number(birthYear)
     );
 }
@@ -223,33 +157,35 @@ export function calculateAge(
 export function synchronizePlayerAge(
     gameState
 ) {
-    const birthYear =
-        gameState
-            .player
-            ?.identity
-            ?.birthYear;
-
-    if (
-        !Number.isFinite(
-            Number(birthYear)
-        )
-    ) {
-        return (
-            gameState
-                .calendar
-                .age
-        );
-    }
-
     gameState.calendar.age =
         calculateAge(
-            birthYear,
-            gameState.calendar.year
+            gameState
         );
 
-    return (
+    return gameState.calendar.age;
+}
+
+
+export function advanceToNextYear(
+    gameState
+) {
+    gameState.calendar.year +=
+        1;
+
+    synchronizePlayerAge(
         gameState
-            .calendar
-            .age
     );
+
+    gameState.calendar.phase =
+        "preseason";
+
+    gameState.calendar
+        .seasonStarted =
+        false;
+
+    gameState.calendar
+        .seasonCompleted =
+        false;
+
+    return gameState.calendar;
 }
