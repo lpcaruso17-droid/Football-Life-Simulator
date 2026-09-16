@@ -7,7 +7,7 @@ import {
 export const GAME_VERSION =
     "0.5.0-alpha";
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 
 function createId(prefix) {
@@ -224,7 +224,8 @@ export function createGameState({
         },
 
         housing: {
-            type: "family_home",
+            type:
+                "family_home",
 
             cityId: null,
 
@@ -238,7 +239,8 @@ export function createGameState({
 
             pendingRelocation: false,
 
-            sinceYear: startYear,
+            sinceYear:
+                startYear,
 
             history: []
         },
@@ -253,6 +255,20 @@ export function createGameState({
             formerTeammateIds: [],
 
             socialLife: 60,
+
+            history: []
+        },
+
+        representation: {
+            currentAgentPersonId: null,
+
+            currentAgencyId: null,
+
+            activeAgreement: null,
+
+            guardianConsent: false,
+
+            offers: [],
 
             history: []
         },
@@ -278,7 +294,13 @@ export function createGameState({
 
             allIds: [],
 
-            activeContractId: null
+            activeContractId: null,
+
+            offers: [],
+
+            alerts: [],
+
+            history: []
         },
 
         seasons: {
@@ -372,6 +394,8 @@ export function createGameState({
             generatedPlayers: [],
 
             clubState: {},
+
+            agencyState: {},
 
             currentStorylines: []
         },
