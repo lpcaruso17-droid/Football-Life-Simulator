@@ -7,7 +7,7 @@ import {
 export const GAME_VERSION =
     "0.5.0-alpha";
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 
 function createId(prefix) {
@@ -219,6 +219,38 @@ export function createGameState({
             offers: [],
 
             trials: [],
+
+            history: []
+        },
+
+        professional: {
+            status:
+                "academy",
+
+            readiness: 0,
+
+            firstTeamTrust: 0,
+
+            trainingWithFirstTeam:
+                false,
+
+            firstTeamTrainingCount: 0,
+
+            firstTeamTrainingYear:
+                null,
+
+            firstCallUp: null,
+
+            firstBench: null,
+
+            debut: null,
+
+            firstStart: null,
+
+            firstGoal: null,
+
+            contractSignedYear:
+                null,
 
             history: []
         },
