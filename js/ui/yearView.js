@@ -15,6 +15,10 @@ import {
 } from "../core/timeEngine.js";
 
 import {
+    showFeedback
+} from "./feedback.js";
+
+import {
     navigateTo
 } from "./router.js";
 
@@ -102,6 +106,7 @@ function renderProgress(
 
     return `
         <div class="year-progress">
+
             ${phases
                 .map(
                     (
@@ -140,6 +145,7 @@ function renderProgress(
                     `
                 )
                 .join("")}
+
         </div>
     `;
 }
@@ -153,8 +159,10 @@ function renderEventStep(
     const event =
         step.event;
 
+
     root.innerHTML = `
         <main class="app-shell page">
+
             <div class="eyebrow">
                 DECISÃO ·
                 ${escapeHtml(
@@ -180,7 +188,9 @@ function renderEventStep(
                 step.phase
             )}
 
+
             <section class="year-event-card">
+
                 <div class="year-event-meta">
                     ${escapeHtml(
                         game.calendar.year
@@ -194,7 +204,9 @@ function renderEventStep(
                     anos
                 </div>
 
+
                 <div class="year-event-choices">
+
                     ${(
                         event.choices ??
                         []
@@ -221,8 +233,11 @@ function renderEventStep(
                             `
                         )
                         .join("")}
+
                 </div>
+
             </section>
+
         </main>
     `;
 
@@ -236,18 +251,23 @@ function renderEventStep(
                 button
                     .addEventListener(
                         "click",
-                        () => {
+                        async () => {
                             const choiceId =
                                 button
                                     .dataset
                                     .choiceId;
 
                             try {
+                                button.disabled =
+                                    true;
+
+
                                 const result =
                                     resolveCurrentYearEvent(
                                         game,
                                         choiceId
                                     );
+
 
                                 saveGame(
                                     game,
@@ -256,6 +276,7 @@ function renderEventStep(
                                             "year_event_choice"
                                     }
                                 );
+
 
                                 renderYearStep(
                                     root,
@@ -269,11 +290,29 @@ function renderEventStep(
                                     error
                                 );
 
-                                window.alert(
-                                    error
-                                        ?.message ??
-                                    "Não foi possível processar a decisão."
-                                );
+
+                                await showFeedback({
+                                    type:
+                                        "error",
+
+                                    eyebrow:
+                                        "DECISÃO",
+
+                                    title:
+                                        "Não foi possível concluir",
+
+                                    message:
+                                        error
+                                            ?.message ??
+                                        "Não foi possível processar esta decisão.",
+
+                                    primaryLabel:
+                                        "VOLTAR"
+                                });
+
+
+                                button.disabled =
+                                    false;
                             }
                         }
                     );
@@ -290,10 +329,20 @@ function renderNotificationStep(
     const event =
         step.event;
 
+    const continueLabel =
+        event.continueLabel ??
+        "SEGUIR";
+
+
     root.innerHTML = `
         <main class="app-shell page">
+
             <div class="eyebrow">
-                ACONTECIMENTO ·
+                ${escapeHtml(
+                    event.notificationLabel ??
+                    "ACONTECIMENTO"
+                )}
+                ·
                 ${escapeHtml(
                     getPhaseLabel(
                         step.phase
@@ -317,7 +366,9 @@ function renderNotificationStep(
                 step.phase
             )}
 
+
             <section class="year-event-card">
+
                 <div class="year-event-meta">
                     ${escapeHtml(
                         game.calendar.year
@@ -331,26 +382,38 @@ function renderNotificationStep(
                     anos
                 </div>
 
-                <p
-                    class="muted"
-                    style="
-                        margin-bottom: 22px;
-                        max-width: 700px;
-                    "
-                >
-                    Este é um acontecimento da sua história,
-                    não uma escolha. A consequência será registrada
-                    quando você continuar.
-                </p>
+
+                ${
+                    event.notificationText
+                        ? `
+                            <p
+                                class="muted"
+                                style="
+                                    margin-bottom: 22px;
+                                    max-width: 700px;
+                                "
+                            >
+                                ${escapeHtml(
+                                    event.notificationText
+                                )}
+                            </p>
+                        `
+                        : ""
+                }
+
 
                 <button
                     id="continue-notification"
                     class="btn btn-primary"
                     type="button"
                 >
-                    CONTINUAR
+                    ${escapeHtml(
+                        continueLabel
+                    )}
                 </button>
+
             </section>
+
         </main>
     `;
 
@@ -361,12 +424,18 @@ function renderNotificationStep(
         )
         ?.addEventListener(
             "click",
-            () => {
+            async event => {
                 try {
+                    event.currentTarget
+                        .disabled =
+                        true;
+
+
                     const result =
                         resolveCurrentYearNotification(
                             game
                         );
+
 
                     saveGame(
                         game,
@@ -375,6 +444,7 @@ function renderNotificationStep(
                                 "year_notification"
                         }
                     );
+
 
                     renderYearStep(
                         root,
@@ -388,11 +458,30 @@ function renderNotificationStep(
                         error
                     );
 
-                    window.alert(
-                        error
-                            ?.message ??
-                        "Não foi possível continuar."
-                    );
+
+                    await showFeedback({
+                        type:
+                            "error",
+
+                        eyebrow:
+                            "ACONTECIMENTO",
+
+                        title:
+                            "Não foi possível continuar",
+
+                        message:
+                            error
+                                ?.message ??
+                            "O jogo não conseguiu registrar este acontecimento.",
+
+                        primaryLabel:
+                            "VOLTAR"
+                    });
+
+
+                    event.currentTarget
+                        .disabled =
+                        false;
                 }
             }
         );
@@ -412,8 +501,10 @@ function renderYearSummary(
             ?.decision ??
         null;
 
+
     root.innerHTML = `
         <main class="app-shell page">
+
             <div class="eyebrow">
                 Ano concluído
             </div>
@@ -447,7 +538,9 @@ function renderYearSummary(
                 neste ano.
             </p>
 
+
             <section class="year-summary-grid">
+
                 <div class="stat-card">
                     <div class="stat-label">
                         Jogos
@@ -462,6 +555,7 @@ function renderYearSummary(
                         )}
                     </div>
                 </div>
+
 
                 <div class="stat-card">
                     <div class="stat-label">
@@ -478,6 +572,7 @@ function renderYearSummary(
                     </div>
                 </div>
 
+
                 <div class="stat-card">
                     <div class="stat-label">
                         Média
@@ -492,6 +587,7 @@ function renderYearSummary(
                         )}
                     </div>
                 </div>
+
 
                 <div class="stat-card">
                     <div class="stat-label">
@@ -508,6 +604,7 @@ function renderYearSummary(
                     </div>
                 </div>
 
+
                 <div class="stat-card">
                     <div class="stat-label">
                         Assistências
@@ -523,6 +620,7 @@ function renderYearSummary(
                     </div>
                 </div>
 
+
                 <div class="stat-card">
                     <div class="stat-label">
                         Reputação
@@ -534,10 +632,14 @@ function renderYearSummary(
                         )}
                     </div>
                 </div>
+
             </section>
 
+
             <div class="dashboard-grid">
+
                 <section class="dashboard-panel">
+
                     <div class="section-title">
                         Futebol
                     </div>
@@ -546,6 +648,7 @@ function renderYearSummary(
                         season
                             ? `
                                 <div class="info-grid">
+
                                     <div>
                                         <div class="info-item-label">
                                             Clube
@@ -558,6 +661,7 @@ function renderYearSummary(
                                         </div>
                                     </div>
 
+
                                     <div>
                                         <div class="info-item-label">
                                             Competição
@@ -569,6 +673,7 @@ function renderYearSummary(
                                             )}
                                         </div>
                                     </div>
+
 
                                     <div>
                                         <div class="info-item-label">
@@ -583,6 +688,7 @@ function renderYearSummary(
                                         </div>
                                     </div>
 
+
                                     <div>
                                         <div class="info-item-label">
                                             Status final
@@ -594,6 +700,7 @@ function renderYearSummary(
                                             )}
                                         </div>
                                     </div>
+
                                 </div>
                             `
                             : `
@@ -603,14 +710,18 @@ function renderYearSummary(
                                 </div>
                             `
                     }
+
                 </section>
 
+
                 <section class="dashboard-panel">
+
                     <div class="section-title">
                         Vida
                     </div>
 
                     <div class="info-grid">
+
                         <div>
                             <div class="info-item-label">
                                 Felicidade
@@ -622,6 +733,7 @@ function renderYearSummary(
                                 )}
                             </div>
                         </div>
+
 
                         <div>
                             <div class="info-item-label">
@@ -635,6 +747,7 @@ function renderYearSummary(
                             </div>
                         </div>
 
+
                         <div>
                             <div class="info-item-label">
                                 Escola
@@ -646,6 +759,7 @@ function renderYearSummary(
                                 )}
                             </div>
                         </div>
+
 
                         <div>
                             <div class="info-item-label">
@@ -660,9 +774,13 @@ function renderYearSummary(
                                 )}
                             </div>
                         </div>
+
                     </div>
+
                 </section>
+
             </div>
+
 
             <div
                 class="button-row"
@@ -676,6 +794,7 @@ function renderYearSummary(
                     VOLTAR PARA MINHA VIDA
                 </button>
             </div>
+
         </main>
     `;
 
@@ -695,9 +814,11 @@ function renderYearSummary(
                     }
                 );
 
+
                 clearYearFlow(
                     game
                 );
+
 
                 navigateTo(
                     "dashboard"
@@ -770,6 +891,7 @@ export function renderYearView(
     const game =
         loadActiveGame();
 
+
     if (!game) {
         navigateTo(
             "home"
@@ -785,6 +907,7 @@ export function renderYearView(
                 game
             );
 
+
         renderYearStep(
             root,
             game,
@@ -795,9 +918,12 @@ export function renderYearView(
             error
         );
 
+
         root.innerHTML = `
             <main class="app-shell page">
+
                 <div class="card empty-state">
+
                     <strong>
                         Não foi possível iniciar o ano.
                     </strong>
@@ -819,9 +945,12 @@ export function renderYearView(
                     >
                         Voltar
                     </button>
+
                 </div>
+
             </main>
         `;
+
 
         root
             .querySelector(
