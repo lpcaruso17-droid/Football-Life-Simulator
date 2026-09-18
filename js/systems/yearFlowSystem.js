@@ -37,8 +37,20 @@ import {
 } from "../events/childhood.js";
 
 import {
+    ADOLESCENCE_EVENTS
+} from "../events/adolescence.js";
+
+import {
     ACADEMY_EVENTS
 } from "../events/academy.js";
+
+import {
+    ACADEMY_EXTRA_EVENTS
+} from "../events/academyExtra.js";
+
+import {
+    YOUTH_SOCIAL_EVENTS
+} from "../events/youthSocial.js";
 
 import {
     CAREER_EVENTS
@@ -316,6 +328,7 @@ function getGeneralEventPool(
         ...CAREER_EVENTS
     ];
 
+
     if (
         gameState.calendar.age <=
         13
@@ -324,6 +337,29 @@ function getGeneralEventPool(
             ...CHILDHOOD_EVENTS
         );
     }
+
+
+    if (
+        gameState.calendar.age >=
+            13 &&
+        gameState.calendar.age <=
+            19
+    ) {
+        pool.push(
+            ...ADOLESCENCE_EVENTS
+        );
+    }
+
+
+    if (
+        gameState.calendar.age <=
+        20
+    ) {
+        pool.push(
+            ...YOUTH_SOCIAL_EVENTS
+        );
+    }
+
 
     if (
         gameState.player
@@ -334,9 +370,11 @@ function getGeneralEventPool(
         )
     ) {
         pool.push(
-            ...ACADEMY_EVENTS
+            ...ACADEMY_EVENTS,
+            ...ACADEMY_EXTRA_EVENTS
         );
     }
+
 
     if (
         isProfessional(
@@ -347,6 +385,7 @@ function getGeneralEventPool(
             ...PROFESSIONAL_LIFE_EVENTS
         );
     }
+
 
     return pool;
 }
@@ -622,6 +661,7 @@ function completeCurrentNarrativeItem(
     const event =
         flow.currentEvent;
 
+
     if (
         event &&
         !flow.eventsSeen
@@ -634,8 +674,10 @@ function completeCurrentNarrativeItem(
         );
     }
 
+
     flow.totalEventsResolved +=
         1;
+
 
     flow.phaseEventCounts[
         phase
@@ -647,6 +689,7 @@ function completeCurrentNarrativeItem(
             0
         ) +
         1;
+
 
     flow.currentEvent =
         null;
@@ -664,6 +707,7 @@ function completeCurrentNarrativeItem(
         flow.phaseEventCounts[
             phase
         ] ?? 0;
+
 
     if (
         completed >=
@@ -788,13 +832,7 @@ export function getNextYearStep(
                 };
             }
 
-            /*
-             * Nenhum conteúdo válido
-             * para esta fase.
-             *
-             * Não inventamos um evento
-             * apenas para preencher espaço.
-             */
+
             flow.phaseEventCounts[
                 phase
             ] =
@@ -823,6 +861,7 @@ export function resolveCurrentYearEvent(
             gameState
         );
 
+
     if (
         !flow.currentEvent ||
         flow.currentKind !==
@@ -833,6 +872,7 @@ export function resolveCurrentYearEvent(
         );
     }
 
+
     const resolution =
         resolveEventChoice(
             gameState,
@@ -840,10 +880,12 @@ export function resolveCurrentYearEvent(
             choiceId
         );
 
+
     completeCurrentNarrativeItem(
         gameState,
         flow
     );
+
 
     return {
         resolution,
@@ -865,6 +907,7 @@ export function resolveCurrentYearNotification(
             gameState
         );
 
+
     if (
         !flow.currentEvent ||
         flow.currentKind !==
@@ -875,16 +918,19 @@ export function resolveCurrentYearNotification(
         );
     }
 
+
     const resolution =
         resolveEventNotification(
             gameState,
             flow.currentEvent
         );
 
+
     completeCurrentNarrativeItem(
         gameState,
         flow
     );
+
 
     return {
         resolution,
