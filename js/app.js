@@ -22,12 +22,54 @@ import {
     renderInboxView
 } from "./ui/inboxView.js";
 
+import {
+    showToast
+} from "./ui/feedback.js";
+
+
+function registerGlobalFeedback() {
+    window.addEventListener(
+        "fls:new-messages",
+        event => {
+            const detail =
+                event.detail ??
+                {};
+
+            const count =
+                Number(
+                    detail.count
+                ) || 1;
+
+
+            showToast({
+                type:
+                    "info",
+
+                title:
+                    count > 1
+                        ? `${count} novas mensagens`
+                        : "Nova mensagem recebida",
+
+                message:
+                    detail.title ??
+                    "Algo novo chegou à sua Central de Mensagens.",
+
+                duration:
+                    6000
+            });
+        }
+    );
+}
+
 
 function bootstrap() {
     const root =
         document.querySelector(
             "#app"
         );
+
+    registerGlobalFeedback();
+
 
     initializeRouter({
         root,

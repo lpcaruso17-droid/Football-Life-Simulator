@@ -6,6 +6,7 @@ import {
 import {
     refreshInboxOpportunities,
     getInboxMessages,
+    getInboxChannelCounts,
     markInboxMessageRead,
     resolveInboxAction
 } from "../systems/inboxSystem.js";
@@ -17,6 +18,31 @@ import {
 import {
     navigateTo
 } from "./router.js";
+
+
+let activeInboxChannel =
+    "all";
+
+
+const CHANNEL_LABELS = {
+    all:
+        "Todas",
+
+    family:
+        "Família",
+
+    club:
+        "Clube",
+
+    agent:
+        "Empresário",
+
+    contracts:
+        "Contratos",
+
+    social:
+        "Social"
+};
 
 
 function escapeHtml(
@@ -53,7 +79,7 @@ function getTypeLabel(
 ) {
     const labels = {
         academy:
-            "CLUBE",
+            "PROPOSTA DE CLUBE",
 
         representation:
             "EMPRESÁRIO",
@@ -62,12 +88,22 @@ function getTypeLabel(
             "CONTRATO DE FORMAÇÃO",
 
         professional_contract:
-            "CONTRATO PROFISSIONAL"
+            "CONTRATO PROFISSIONAL",
+
+        family_message:
+            "MENSAGEM DA FAMÍLIA",
+
+        family_decision:
+            "RESPOSTA DA FAMÍLIA",
+
+        social_message:
+            "MENSAGEM PESSOAL"
     };
 
     return (
         labels[
-            message.offerType
+            message.offerType ??
+            message.type
         ] ??
         "MENSAGEM"
     );
@@ -88,13 +124,40 @@ function getResolutionLabel(
             "Expirada",
 
         withdrawn:
-            "Retirada pelo clube"
+            "Retirada pelo clube",
+
+        read:
+            "Lida"
     };
 
     return (
         labels[resolution] ??
         resolution ??
         "Resolvida"
+    );
+}
+
+
+function getFamilyStatusLabel(
+    status
+) {
+    const labels = {
+        approved:
+            "Família: apoia a decisão",
+
+        concerned:
+            "Família: aceita, mas está preocupada",
+
+        needs_info:
+            "Família: quer entender melhor",
+
+        opposed:
+            "Família: é contra a decisão"
+    };
+
+    return (
+        labels[status] ??
+        null
     );
 }
 
@@ -117,6 +180,36 @@ function renderMessage(
         message.offerType ===
             "professional_contract";
 
+    const familyStatus =
+        message
+            .familyDecisionStatus;
+
+    const familyLabel =
+        getFamilyStatusLabel(
+            familyStatus
+        );
+
+    const familyCanTalkAgain =
+        minor &&
+        message.actionable &&
+        (
+            !familyStatus ||
+            (
+                [
+                    "needs_info",
+                    "opposed"
+                ].includes(
+                    familyStatus
+                ) &&
+                (
+                    message
+                        .familyConversationCount ??
+                    0
+                ) < 2
+            )
+        );
+
+
     return `
         <article
             class="
@@ -137,16 +230,30 @@ function renderMessage(
                 message.id
             )}"
         >
+
             <div class="inbox-card-top">
 
                 <div>
 
-                    <div class="inbox-type">
-                        ${escapeHtml(
-                            getTypeLabel(
-                                message
-                            )
-                        )}
+                    <div class="inbox-type-row">
+
+                        <div class="inbox-type">
+                            ${escapeHtml(
+                                getTypeLabel(
+                                    message
+                                )
+                            )}
+                        </div>
+
+                        <div class="inbox-channel">
+                            ${escapeHtml(
+                                CHANNEL_LABELS[
+                                    message.channel
+                                ] ??
+                                "Mensagem"
+                            )}
+                        </div>
+
                     </div>
 
                     <h2>
@@ -156,6 +263,7 @@ function renderMessage(
                     </h2>
 
                 </div>
+
 
                 <div class="inbox-date">
                     ${escapeHtml(
@@ -181,6 +289,26 @@ function renderMessage(
 
 
             ${
+                familyLabel
+                    ? `
+                        <div
+                            class="
+                                inbox-family-status
+                                ${escapeHtml(
+                                    familyStatus
+                                )}
+                            "
+                        >
+                            ${escapeHtml(
+                                familyLabel
+                            )}
+                        </div>
+                    `
+                    : ""
+            }
+
+
+            ${
                 resolved
                     ? `
                         <div class="inbox-resolution">
@@ -191,58 +319,178 @@ function renderMessage(
                             )}
                         </div>
                     `
-                    : `
-                        <div class="inbox-actions">
+                    : (
+                        message.actionable
+                            ? `
+                                <div class="inbox-actions">
 
-                            ${
-                                minor
-                                    ? `
-                                        <button
-                                            type="button"
-                                            class="btn"
-                                            data-action="family"
-                                        >
-                                            Conversar com a família
-                                        </button>
-                                    `
-                                    : ""
-                            }
+                                    ${
+                                        familyCanTalkAgain
+                                            ? `
+                                                <button
+                                                    type="button"
+                                                    class="btn"
+                                                    data-action="family"
+                                                >
+                                                    ${
+                                                        familyStatus
+                                                            ? "Conversar novamente"
+                                                            : "Conversar com a família"
+                                                    }
+                                                </button>
+                                            `
+                                            : ""
+                                    }
 
-                            ${
-                                canNegotiate
-                                    ? `
-                                        <button
-                                            type="button"
-                                            class="btn"
-                                            data-action="negotiate"
-                                        >
-                                            Negociar
-                                        </button>
-                                    `
-                                    : ""
-                            }
+                                    ${
+                                        canNegotiate
+                                            ? `
+                                                <button
+                                                    type="button"
+                                                    class="btn"
+                                                    data-action="negotiate"
+                                                >
+                                                    Negociar
+                                                </button>
+                                            `
+                                            : ""
+                                    }
 
-                            <button
-                                type="button"
-                                class="btn btn-primary"
-                                data-action="accept"
-                            >
-                                Aceitar
-                            </button>
+                                    <button
+                                        type="button"
+                                        class="btn btn-primary"
+                                        data-action="accept"
+                                    >
+                                        Aceitar
+                                    </button>
 
-                            <button
-                                type="button"
-                                class="btn btn-danger"
-                                data-action="decline"
-                            >
-                                Recusar
-                            </button>
+                                    <button
+                                        type="button"
+                                        class="btn btn-danger"
+                                        data-action="decline"
+                                    >
+                                        Recusar
+                                    </button>
 
-                        </div>
-                    `
+                                </div>
+                            `
+                            : `
+                                <div class="inbox-message-read">
+                                    Mensagem pessoal
+                                </div>
+                            `
+                    )
             }
+
         </article>
     `;
+}
+
+
+async function showFamilyDecision(
+    decision
+) {
+    if (
+        decision.status ===
+        "approved"
+    ) {
+        await showFeedback({
+            type:
+                "success",
+
+            eyebrow:
+                "FAMÍLIA",
+
+            title:
+                `${decision.guardianName} apoia você`,
+
+            message:
+                decision.message,
+
+            primaryLabel:
+                "VOLTAR À PROPOSTA"
+        });
+
+        return;
+    }
+
+
+    if (
+        decision.status ===
+        "concerned"
+    ) {
+        await showFeedback({
+            type:
+                "warning",
+
+            eyebrow:
+                "FAMÍLIA",
+
+            title:
+                "Sua família aceita, mas está preocupada",
+
+            message:
+                decision.message,
+
+            primaryLabel:
+                "VOLTAR À PROPOSTA"
+        });
+
+        return;
+    }
+
+
+    if (
+        decision.status ===
+        "needs_info"
+    ) {
+        await showFeedback({
+            type:
+                "info",
+
+            eyebrow:
+                "FAMÍLIA",
+
+            title:
+                "Ainda existem dúvidas",
+
+            message:
+                decision.message,
+
+            details:
+                "Você poderá conversar novamente antes de tomar a decisão.",
+
+            primaryLabel:
+                "ENTENDI"
+        });
+
+        return;
+    }
+
+
+    await showFeedback({
+        type:
+            "error",
+
+        eyebrow:
+            "FAMÍLIA",
+
+        title:
+            "Sua família é contra essa decisão",
+
+        message:
+            decision.message,
+
+        details:
+            decision
+                .conversationCount <
+            2
+                ? "Ainda será possível conversar novamente."
+                : "Por enquanto, sua família não autorizou essa decisão.",
+
+        primaryLabel:
+            "VOLTAR"
+    });
 }
 
 
@@ -254,22 +502,9 @@ async function showActionResult(
         action ===
         "family"
     ) {
-        await showFeedback({
-            type:
-                "info",
-
-            eyebrow:
-                "FAMÍLIA",
-
-            title:
-                "Vocês conversaram sobre a proposta",
-
-            message:
-                "Sua família ouviu os detalhes da oportunidade. Por enquanto, a conversa foi registrada e você já pode decidir como deseja seguir.",
-
-            primaryLabel:
-                "VOLTAR À PROPOSTA"
-        });
+        await showFamilyDecision(
+            result.decision
+        );
 
         return;
     }
@@ -294,10 +529,10 @@ async function showActionResult(
                     "O clube melhorou a proposta",
 
                 message:
-                    "Sua tentativa de negociação funcionou. As condições financeiras da oferta foram aumentadas.",
+                    "A negociação funcionou e as condições financeiras foram atualizadas.",
 
                 primaryLabel:
-                    "VER NOVA PROPOSTA"
+                    "VER PROPOSTA"
             });
 
             return;
@@ -319,7 +554,7 @@ async function showActionResult(
                     "O clube manteve os valores",
 
                 message:
-                    "A diretoria ouviu sua contraproposta, mas decidiu manter as condições originais. A oferta continua disponível.",
+                    "A diretoria ouviu sua contraproposta, mas decidiu manter as condições originais.",
 
                 primaryLabel:
                     "ENTENDI"
@@ -344,7 +579,7 @@ async function showActionResult(
                     "A proposta foi retirada",
 
                 message:
-                    "O clube não aceitou avançar nos novos termos e decidiu encerrar a negociação.",
+                    "O clube não aceitou avançar nos novos termos e encerrou a negociação.",
 
                 primaryLabel:
                     "CONTINUAR"
@@ -370,7 +605,7 @@ async function showActionResult(
                 "Proposta aceita",
 
             message:
-                "A decisão foi registrada e agora passa a fazer parte da sua trajetória.",
+                "A decisão agora faz parte da sua trajetória.",
 
             primaryLabel:
                 "CONTINUAR"
@@ -395,12 +630,111 @@ async function showActionResult(
                 "Proposta recusada",
 
             message:
-                "Você decidiu não seguir com essa oportunidade. A decisão foi registrada na sua carreira.",
+                "Você decidiu seguir outro caminho.",
 
             primaryLabel:
                 "CONTINUAR"
         });
     }
+}
+
+
+async function showActionError(
+    error
+) {
+    if (
+        error.code ===
+        "FAMILY_OPPOSED"
+    ) {
+        await showFeedback({
+            type:
+                "error",
+
+            eyebrow:
+                "FAMÍLIA",
+
+            title:
+                "Sua família não autorizou",
+
+            message:
+                error.message,
+
+            primaryLabel:
+                "VOLTAR"
+        });
+
+        return;
+    }
+
+
+    if (
+        error.code ===
+        "FAMILY_NEEDS_INFO"
+    ) {
+        await showFeedback({
+            type:
+                "warning",
+
+            eyebrow:
+                "FAMÍLIA",
+
+            title:
+                "A decisão ainda não está liberada",
+
+            message:
+                error.message,
+
+            primaryLabel:
+                "VOLTAR"
+        });
+
+        return;
+    }
+
+
+    if (
+        error.code ===
+        "FAMILY_NOT_DISCUSSSED"
+    ) {
+        await showFeedback({
+            type:
+                "info",
+
+            eyebrow:
+                "FAMÍLIA",
+
+            title:
+                "Converse com sua família primeiro",
+
+            message:
+                error.message,
+
+            primaryLabel:
+                "VOLTAR"
+        });
+
+        return;
+    }
+
+
+    await showFeedback({
+        type:
+            "error",
+
+        eyebrow:
+            "AÇÃO BLOQUEADA",
+
+        title:
+            "Não foi possível realizar a ação",
+
+        message:
+            error
+                ?.message ??
+            "O jogo não conseguiu concluir esta ação.",
+
+        primaryLabel:
+            "VOLTAR"
+    });
 }
 
 
@@ -439,9 +773,16 @@ export function renderInboxView(
     }
 
 
+    const counts =
+        getInboxChannelCounts(
+            game
+        );
+
+
     const messages =
         getInboxMessages(
-            game
+            game,
+            activeInboxChannel
         );
 
 
@@ -453,18 +794,17 @@ export function renderInboxView(
                 <div>
 
                     <div class="eyebrow">
-                        Decisões
+                        CENTRAL DE MENSAGENS
                     </div>
 
                     <h1 class="page-title">
-                        Caixa de entrada
+                        Sua vida também acontece aqui.
                     </h1>
 
                     <p class="page-subtitle">
-                        Clubes, empresários e contratos
-                        importantes aparecem aqui.
-                        Algumas decisões podem mudar
-                        completamente sua trajetória.
+                        Família, amigos, clubes, empresários
+                        e contratos podem procurar você
+                        durante a carreira.
                     </p>
 
                 </div>
@@ -478,6 +818,48 @@ export function renderInboxView(
                 </button>
 
             </div>
+
+
+            <nav class="inbox-tabs">
+
+                ${Object
+                    .keys(
+                        CHANNEL_LABELS
+                    )
+                    .map(
+                        channel => `
+                            <button
+                                type="button"
+                                class="
+                                    inbox-tab
+                                    ${
+                                        activeInboxChannel ===
+                                        channel
+                                            ? "active"
+                                            : ""
+                                    }
+                                "
+                                data-inbox-channel="${channel}"
+                            >
+                                ${CHANNEL_LABELS[channel]}
+
+                                ${
+                                    counts[
+                                        channel
+                                    ]?.unread
+                                        ? `
+                                            <span class="inbox-tab-count">
+                                                ${counts[channel].unread}
+                                            </span>
+                                        `
+                                        : ""
+                                }
+                            </button>
+                        `
+                    )
+                    .join("")}
+
+            </nav>
 
 
             <section class="inbox-list">
@@ -495,13 +877,9 @@ export function renderInboxView(
                             .join("")
                         : `
                             <div class="card empty-state">
-                                Sua caixa de entrada está vazia.
 
-                                <br><br>
+                                Nenhuma mensagem nesta categoria.
 
-                                Continue vivendo os anos da carreira.
-                                Novas oportunidades podem aparecer
-                                conforme sua reputação e desempenho crescem.
                             </div>
                         `
                 }
@@ -510,6 +888,30 @@ export function renderInboxView(
 
         </main>
     `;
+
+
+    root
+        .querySelectorAll(
+            "[data-inbox-channel]"
+        )
+        .forEach(
+            button => {
+                button
+                    .addEventListener(
+                        "click",
+                        () => {
+                            activeInboxChannel =
+                                button
+                                    .dataset
+                                    .inboxChannel;
+
+                            renderInboxView(
+                                root
+                            );
+                        }
+                    );
+            }
+        );
 
 
     root
@@ -566,7 +968,6 @@ export function renderInboxView(
                                                 .dataset
                                                 .action;
 
-
                                         try {
                                             button.disabled =
                                                 true;
@@ -606,24 +1007,9 @@ export function renderInboxView(
                                             );
 
 
-                                            await showFeedback({
-                                                type:
-                                                    "error",
-
-                                                eyebrow:
-                                                    "AÇÃO BLOQUEADA",
-
-                                                title:
-                                                    "Ainda não é possível fazer isso",
-
-                                                message:
-                                                    error
-                                                        ?.message ??
-                                                    "Não foi possível realizar esta ação.",
-
-                                                primaryLabel:
-                                                    "VOLTAR"
-                                            });
+                                            await showActionError(
+                                                error
+                                            );
 
 
                                             button.disabled =

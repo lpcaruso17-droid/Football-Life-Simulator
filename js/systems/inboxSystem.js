@@ -1,6 +1,7 @@
 import {
     chance,
-    randomInt
+    randomInt,
+    pick
 } from "../core/rng.js";
 
 import {
@@ -32,8 +33,30 @@ import {
 } from "./professionalPathSystem.js";
 
 import {
+    getPerson
+} from "./personSystem.js";
+
+import {
+    getCloseFriends
+} from "./socialSystem.js";
+
+import {
+    discussOfferWithFamily,
+    canFamilyApproveOffer
+} from "./familyDecisionSystem.js";
+
+import {
     addTimelineEntry
 } from "./timelineSystem.js";
+
+
+const CHANNELS = [
+    "family",
+    "club",
+    "agent",
+    "contracts",
+    "social"
+];
 
 
 function roundMoney(
@@ -47,7 +70,7 @@ function roundMoney(
 }
 
 
-function ensureInbox(
+function ensureInboxState(
     gameState
 ) {
     if (
@@ -58,7 +81,22 @@ function ensureInbox(
         gameState.inbox = [];
     }
 
-    return gameState.inbox;
+    if (
+        !gameState.inboxState ||
+        typeof gameState.inboxState !==
+            "object"
+    ) {
+        gameState.inboxState = {
+            lastFamilyMessageYear:
+                null,
+
+            lastSocialMessageYear:
+                null,
+
+            lastSocialPersonId:
+                null
+        };
+    }
 }
 
 
@@ -79,14 +117,18 @@ function createInboxMessage(
     gameState,
     {
         id,
+        channel,
         type,
-        offerType,
-        offerId,
+        offerType = null,
+        offerId = null,
+        senderPersonId = null,
         title,
-        body
+        body,
+        actionable = false,
+        metadata = {}
     }
 ) {
-    ensureInbox(
+    ensureInboxState(
         gameState
     );
 
@@ -102,15 +144,28 @@ function createInboxMessage(
     const message = {
         id,
 
+        channel:
+            CHANNELS.includes(
+                channel
+            )
+                ? channel
+                : "club",
+
         type,
 
         offerType,
 
         offerId,
 
+        senderPersonId,
+
         title,
 
         body,
+
+        actionable,
+
+        metadata,
 
         createdYear:
             gameState.calendar.year,
@@ -121,7 +176,14 @@ function createInboxMessage(
         status:
             "unread",
 
-        resolution: null
+        resolution:
+            null,
+
+        familyDecisionStatus:
+            null,
+
+        familyConversationCount:
+            0
     };
 
     gameState.inbox.push(
@@ -156,6 +218,9 @@ function syncAcademyOffers(
                             id:
                                 `inbox_academy_${offer.id}`,
 
+                            channel:
+                                "club",
+
                             type:
                                 "offer",
 
@@ -165,8 +230,11 @@ function syncAcademyOffers(
                             offerId:
                                 offer.id,
 
+                            actionable:
+                                true,
+
                             title:
-                                `${offer.clubName} quer você`,
+                                `${offer.clubName} quer conversar com você`,
 
                             body:
                                 `O ${offer.clubName} demonstrou interesse em contar com você na categoria ${String(
@@ -211,6 +279,9 @@ function syncRepresentationOffers(
                             id:
                                 `inbox_representation_${offer.id}`,
 
+                            channel:
+                                "agent",
+
                             type:
                                 "representation",
 
@@ -220,8 +291,11 @@ function syncRepresentationOffers(
                             offerId:
                                 offer.id,
 
+                            actionable:
+                                true,
+
                             title:
-                                `${offer.agencyName} quer representar sua carreira`,
+                                `${offer.agencyName} quer representar você`,
 
                             body:
                                 `A agência ${offer.agencyName} apresentou uma proposta de representação por ${offer.durationYears} ano(s).`
@@ -268,7 +342,7 @@ function syncContractOffers(
                         ).toLocaleString(
                             "pt-BR"
                         )}.`
-                        : `O ${offer.clubName} ofereceu seu primeiro contrato profissional por ${offer.durationYears} ano(s), com salário de R$ ${Number(
+                        : `O ${offer.clubName} ofereceu seu primeiro contrato profissional por ${offer.durationYears} ano(s), salário de R$ ${Number(
                             offer.salary
                         ).toLocaleString(
                             "pt-BR"
@@ -285,6 +359,9 @@ function syncContractOffers(
                             id:
                                 `inbox_contract_${offer.id}`,
 
+                            channel:
+                                "contracts",
+
                             type:
                                 "contract",
 
@@ -296,10 +373,13 @@ function syncContractOffers(
                             offerId:
                                 offer.id,
 
+                            actionable:
+                                true,
+
                             title:
                                 formation
-                                    ? "Contrato de formação"
-                                    : "Primeiro contrato profissional",
+                                    ? "O clube apresentou um contrato de formação"
+                                    : "Seu primeiro contrato profissional chegou",
 
                             body
                         }
@@ -496,6 +576,302 @@ function generatePossibleContractOffer(
 }
 
 
+function getParentCandidates(
+    gameState
+) {
+    return [
+        gameState.family
+            ?.fatherId,
+
+        gameState.family
+            ?.motherId
+    ]
+        .filter(Boolean)
+        .map(
+            id =>
+                getPerson(
+                    gameState,
+                    id
+                )
+        )
+        .filter(Boolean);
+}
+
+
+function generateAmbientFamilyMessage(
+    gameState
+) {
+    ensureInboxState(
+        gameState
+    );
+
+    if (
+        gameState.inboxState
+            .lastFamilyMessageYear ===
+        gameState.calendar.year
+    ) {
+        return null;
+    }
+
+    if (
+        !chance(
+            gameState.rng,
+            0.68
+        )
+    ) {
+        gameState.inboxState
+            .lastFamilyMessageYear =
+            gameState.calendar.year;
+
+        return null;
+    }
+
+    const parents =
+        getParentCandidates(
+            gameState
+        );
+
+    const parent =
+        pick(
+            gameState.rng,
+            parents
+        );
+
+    if (!parent) {
+        return null;
+    }
+
+    const hasClub =
+        Boolean(
+            gameState.player
+                .football
+                .currentClubId
+        );
+
+    const templates =
+        hasClub
+            ? [
+                {
+                    title:
+                        `${parent.identity.fullName} quer saber como você está`,
+
+                    body:
+                        "A rotina no clube tem sido puxada e sua família percebeu que vocês quase não conversaram nos últimos dias."
+                },
+
+                {
+                    title:
+                        "Uma mensagem de casa",
+
+                    body:
+                        `${parent.identity.fullName} mandou uma mensagem lembrando que, independentemente do futebol, você pode contar com a família.`
+                },
+
+                {
+                    title:
+                        `${parent.identity.fullName} acompanhou sua fase no clube`,
+
+                    body:
+                        "Sua família percebeu que sua rotina mudou e quer entender melhor como você está lidando com pressão, escola e futebol."
+                }
+            ]
+            : [
+                {
+                    title:
+                        `${parent.identity.fullName} está preocupado com você`,
+
+                    body:
+                        "O período sem clube começou a preocupar sua família. A mensagem não cobra uma decisão, mas deixa claro que você não precisa enfrentar essa fase sozinho."
+                },
+
+                {
+                    title:
+                        "Conversa em casa sobre o futebol",
+
+                    body:
+                        `${parent.identity.fullName} quer saber como você está lidando com a busca por uma nova oportunidade.`
+                }
+            ];
+
+    const template =
+        pick(
+            gameState.rng,
+            templates
+        );
+
+    gameState.inboxState
+        .lastFamilyMessageYear =
+        gameState.calendar.year;
+
+    return createInboxMessage(
+        gameState,
+        {
+            id:
+                `family_ambient_${gameState.calendar.year}`,
+
+            channel:
+                "family",
+
+            type:
+                "family_message",
+
+            senderPersonId:
+                parent.id,
+
+            title:
+                template.title,
+
+            body:
+                template.body,
+
+            actionable:
+                false
+        }
+    );
+}
+
+
+function chooseSocialFriend(
+    gameState
+) {
+    const friends =
+        getCloseFriends(
+            gameState
+        ) ?? [];
+
+    if (!friends.length) {
+        return null;
+    }
+
+    const alternatives =
+        friends.filter(
+            friend =>
+                friend.id !==
+                gameState.inboxState
+                    .lastSocialPersonId
+        );
+
+    return pick(
+        gameState.rng,
+        alternatives.length
+            ? alternatives
+            : friends
+    );
+}
+
+
+function generateAmbientSocialMessage(
+    gameState
+) {
+    ensureInboxState(
+        gameState
+    );
+
+    if (
+        gameState.calendar.age <
+        11
+    ) {
+        return null;
+    }
+
+    if (
+        gameState.inboxState
+            .lastSocialMessageYear ===
+        gameState.calendar.year
+    ) {
+        return null;
+    }
+
+    if (
+        !chance(
+            gameState.rng,
+            0.62
+        )
+    ) {
+        gameState.inboxState
+            .lastSocialMessageYear =
+            gameState.calendar.year;
+
+        return null;
+    }
+
+    const friend =
+        chooseSocialFriend(
+            gameState
+        );
+
+    if (!friend) {
+        return null;
+    }
+
+    const templates = [
+        {
+            title:
+                `${friend.identity.fullName} mandou mensagem`,
+
+            body:
+                "Seu amigo quer saber quando vocês vão conseguir se encontrar novamente fora da rotina do futebol."
+        },
+
+        {
+            title:
+                `Mensagem de ${friend.identity.fullName}`,
+
+            body:
+                "Seu amigo comentou que vocês têm se falado menos ultimamente e perguntou se está tudo bem."
+        },
+
+        {
+            title:
+                `${friend.identity.fullName} lembrou de você`,
+
+            body:
+                "Uma mensagem simples chegou para saber como estão as coisas e como anda sua rotina."
+        }
+    ];
+
+    const template =
+        pick(
+            gameState.rng,
+            templates
+        );
+
+    gameState.inboxState
+        .lastSocialMessageYear =
+        gameState.calendar.year;
+
+    gameState.inboxState
+        .lastSocialPersonId =
+        friend.id;
+
+    return createInboxMessage(
+        gameState,
+        {
+            id:
+                `social_ambient_${gameState.calendar.year}`,
+
+            channel:
+                "social",
+
+            type:
+                "social_message",
+
+            senderPersonId:
+                friend.id,
+
+            title:
+                template.title,
+
+            body:
+                template.body,
+
+            actionable:
+                false
+        }
+    );
+}
+
+
 function getOfferByMessage(
     gameState,
     message
@@ -552,8 +928,9 @@ function synchronizeResolvedMessages(
         .forEach(
             message => {
                 if (
+                    !message.actionable ||
                     message.status ===
-                    "resolved"
+                        "resolved"
                 ) {
                     return;
                 }
@@ -583,15 +960,54 @@ function synchronizeResolvedMessages(
 }
 
 
+function emitNewMessageEvent(
+    messages
+) {
+    if (
+        !messages.length ||
+        typeof window ===
+            "undefined"
+    ) {
+        return;
+    }
+
+    const newest =
+        messages[
+            messages.length -
+            1
+        ];
+
+    window.dispatchEvent(
+        new CustomEvent(
+            "fls:new-messages",
+            {
+                detail: {
+                    count:
+                        messages.length,
+
+                    channel:
+                        newest.channel,
+
+                    title:
+                        newest.title,
+
+                    body:
+                        newest.body
+                }
+            }
+        )
+    );
+}
+
+
 export function refreshInboxOpportunities(
     gameState
 ) {
-    ensureInbox(
+    ensureInboxState(
         gameState
     );
 
-    const beforeCount =
-        gameState.inbox.length;
+    const created = [];
 
     generatePossibleAcademyInterest(
         gameState
@@ -605,26 +1021,60 @@ export function refreshInboxOpportunities(
         gameState
     );
 
-    syncAcademyOffers(
-        gameState
+    created.push(
+        ...syncAcademyOffers(
+            gameState
+        )
     );
 
-    syncRepresentationOffers(
-        gameState
+    created.push(
+        ...syncRepresentationOffers(
+            gameState
+        )
     );
 
-    syncContractOffers(
-        gameState
+    created.push(
+        ...syncContractOffers(
+            gameState
+        )
     );
+
+    const familyMessage =
+        generateAmbientFamilyMessage(
+            gameState
+        );
+
+    if (familyMessage) {
+        created.push(
+            familyMessage
+        );
+    }
+
+    const socialMessage =
+        generateAmbientSocialMessage(
+            gameState
+        );
+
+    if (socialMessage) {
+        created.push(
+            socialMessage
+        );
+    }
 
     synchronizeResolvedMessages(
         gameState
     );
 
+    emitNewMessageEvent(
+        created
+    );
+
     return {
         createdMessages:
-            gameState.inbox.length -
-            beforeCount,
+            created.length,
+
+        messages:
+            created,
 
         pending:
             getPendingInboxCount(
@@ -635,9 +1085,10 @@ export function refreshInboxOpportunities(
 
 
 export function getInboxMessages(
-    gameState
+    gameState,
+    channel = "all"
 ) {
-    ensureInbox(
+    ensureInboxState(
         gameState
     );
 
@@ -647,36 +1098,97 @@ export function getInboxMessages(
 
     return [
         ...gameState.inbox
-    ].sort(
-        (a, b) =>
-            (
-                b.createdYear -
-                a.createdYear
-            ) ||
-            (
-                b.createdAge -
-                a.createdAge
-            )
+    ]
+        .filter(
+            message =>
+                channel ===
+                    "all" ||
+                message.channel ===
+                    channel
+        )
+        .sort(
+            (a, b) =>
+                (
+                    b.createdYear -
+                    a.createdYear
+                ) ||
+                (
+                    b.createdAge -
+                    a.createdAge
+                )
+        );
+}
+
+
+export function getInboxChannelCounts(
+    gameState
+) {
+    ensureInboxState(
+        gameState
     );
+
+    const result = {
+        all: {
+            total: 0,
+            unread: 0
+        }
+    };
+
+    CHANNELS.forEach(
+        channel => {
+            result[channel] = {
+                total: 0,
+                unread: 0
+            };
+        }
+    );
+
+    gameState.inbox
+        .forEach(
+            message => {
+                const channel =
+                    CHANNELS.includes(
+                        message.channel
+                    )
+                        ? message.channel
+                        : "club";
+
+                result.all.total += 1;
+                result[
+                    channel
+                ].total += 1;
+
+                if (
+                    message.status ===
+                    "unread"
+                ) {
+                    result.all.unread +=
+                        1;
+
+                    result[
+                        channel
+                    ].unread +=
+                        1;
+                }
+            }
+        );
+
+    return result;
 }
 
 
 export function getPendingInboxCount(
     gameState
 ) {
-    ensureInbox(
-        gameState
-    );
-
-    synchronizeResolvedMessages(
+    ensureInboxState(
         gameState
     );
 
     return gameState.inbox
         .filter(
             message =>
-                message.status !==
-                "resolved"
+                message.status ===
+                "unread"
         )
         .length;
 }
@@ -699,14 +1211,39 @@ export function markInboxMessageRead(
             "unread"
     ) {
         message.status =
-            "read";
+            message.actionable
+                ? "read"
+                : "resolved";
+
+        if (
+            !message.actionable
+        ) {
+            message.resolution =
+                "read";
+        }
     }
 
     return message;
 }
 
 
-function requireFamilyDiscussion(
+function createActionError(
+    message,
+    code
+) {
+    const error =
+        new Error(
+            message
+        );
+
+    error.code =
+        code;
+
+    return error;
+}
+
+
+function requireFamilyApproval(
     gameState,
     offer
 ) {
@@ -718,60 +1255,88 @@ function requireFamilyDiscussion(
     }
 
     if (
-        offer.familyDiscussed
+        canFamilyApproveOffer(
+            gameState,
+            offer
+        )
     ) {
         return;
     }
 
-    throw new Error(
-        "Como você ainda é menor de idade, converse com a família antes de aceitar esta proposta."
+    const status =
+        offer.familyDecision
+            ?.status;
+
+    if (
+        status ===
+        "opposed"
+    ) {
+        throw createActionError(
+            offer.familyDecision
+                ?.message ??
+            "Sua família não aprovou essa decisão.",
+
+            "FAMILY_OPPOSED"
+        );
+    }
+
+    if (
+        status ===
+        "needs_info"
+    ) {
+        throw createActionError(
+            "Sua família ainda quer entender melhor a proposta antes de autorizar a decisão.",
+
+            "FAMILY_NEEDS_INFO"
+        );
+    }
+
+    throw createActionError(
+        "Como você ainda é menor de idade, converse com sua família antes de tomar essa decisão.",
+
+        "FAMILY_NOT_DISCUSSSED"
     );
 }
 
 
-function discussOfferWithFamily(
+function createFamilyResponseMessage(
     gameState,
     message,
-    offer
+    decision
 ) {
-    offer.familyDiscussed =
-        true;
-
-    markInboxMessageRead(
-        gameState,
-        message.id
-    );
-
-    addTimelineEntry(
+    return createInboxMessage(
         gameState,
         {
+            id:
+                `family_response_${message.offerId}_${decision.conversationCount}`,
+
+            channel:
+                "family",
+
             type:
-                "family_offer_discussion",
+                "family_decision",
+
+            senderPersonId:
+                decision.guardianPersonId,
 
             title:
-                "Conversa importante em família",
+                `Resposta de ${decision.guardianName}`,
 
-            description:
-                "Você conversou com sua família sobre uma decisão importante para sua carreira.",
+            body:
+                decision.message,
 
-            importance: 4,
+            actionable:
+                false,
 
             metadata: {
-                offerType:
-                    message.offerType,
+                relatedOfferId:
+                    message.offerId,
 
-                offerId:
-                    offer.id
+                familyStatus:
+                    decision.status
             }
         }
     );
-
-    return {
-        status:
-            "family_discussed",
-
-        offer
-    };
 }
 
 
@@ -783,8 +1348,10 @@ function negotiateContractOffer(
         offer.status !==
         "pending"
     ) {
-        throw new Error(
-            "Esta proposta não pode mais ser negociada."
+        throw createActionError(
+            "Esta proposta não pode mais ser negociada.",
+
+            "OFFER_NOT_PENDING"
         );
     }
 
@@ -797,8 +1364,10 @@ function negotiateContractOffer(
         offer.negotiationAttempts >=
         1
     ) {
-        throw new Error(
-            "Esta proposta já passou por uma rodada de negociação."
+        throw createActionError(
+            "Esta proposta já passou por uma rodada de negociação.",
+
+            "NEGOTIATION_ALREADY_USED"
         );
     }
 
@@ -1008,9 +1577,27 @@ export function resolveInboxAction(
         );
 
     if (!message) {
-        throw new Error(
-            "Mensagem não encontrada."
+        throw createActionError(
+            "Mensagem não encontrada.",
+
+            "MESSAGE_NOT_FOUND"
         );
+    }
+
+    if (
+        action ===
+        "read"
+    ) {
+        return {
+            status:
+                "read",
+
+            message:
+                markInboxMessageRead(
+                    gameState,
+                    messageId
+                )
+        };
     }
 
     const offer =
@@ -1020,21 +1607,51 @@ export function resolveInboxAction(
         );
 
     if (!offer) {
-        throw new Error(
-            "A proposta relacionada não foi encontrada."
+        throw createActionError(
+            "A proposta relacionada não foi encontrada.",
+
+            "OFFER_NOT_FOUND"
         );
     }
+
 
     if (
         action ===
         "family"
     ) {
-        return discussOfferWithFamily(
+        const decision =
+            discussOfferWithFamily(
+                gameState,
+                offer,
+                message.offerType
+            );
+
+        message.status =
+            "read";
+
+        message.familyDecisionStatus =
+            decision.status;
+
+        message.familyConversationCount =
+            decision.conversationCount ??
+            0;
+
+        createFamilyResponseMessage(
             gameState,
             message,
-            offer
+            decision
         );
+
+        return {
+            status:
+                "family_discussed",
+
+            decision,
+
+            offer
+        };
     }
+
 
     if (
         action ===
@@ -1046,8 +1663,10 @@ export function resolveInboxAction(
             message.offerType !==
                 "professional_contract"
         ) {
-            throw new Error(
-                "Esta proposta não possui negociação financeira."
+            throw createActionError(
+                "Esta proposta não possui negociação financeira.",
+
+                "NEGOTIATION_NOT_AVAILABLE"
             );
         }
 
@@ -1074,11 +1693,12 @@ export function resolveInboxAction(
         return result;
     }
 
+
     if (
         action ===
         "accept"
     ) {
-        requireFamilyDiscussion(
+        requireFamilyApproval(
             gameState,
             offer
         );
@@ -1178,6 +1798,7 @@ export function resolveInboxAction(
         };
     }
 
+
     if (
         action ===
         "decline"
@@ -1236,7 +1857,10 @@ export function resolveInboxAction(
         };
     }
 
-    throw new Error(
-        `Ação inválida: ${action}`
+
+    throw createActionError(
+        `Ação inválida: ${action}`,
+
+        "INVALID_ACTION"
     );
 }
