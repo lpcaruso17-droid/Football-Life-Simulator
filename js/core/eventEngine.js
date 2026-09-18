@@ -7,16 +7,19 @@ import {
 } from "../systems/timelineSystem.js";
 
 
-const RECENT_EVENT_LIMIT = 8;
-
-const RECENT_THEME_LIMIT = 4;
+const RECENT_EVENT_LIMIT = 10;
+const RECENT_THEME_LIMIT = 5;
+const RECENT_PERSON_LIMIT = 6;
+const EVENT_HISTORY_LIMIT = 50;
 
 
 function ensureEventMemory(
     gameState
 ) {
     if (
-        !gameState.eventState
+        !gameState.eventState ||
+        typeof gameState.eventState !==
+            "object"
     ) {
         gameState.eventState = {};
     }
@@ -58,147 +61,133 @@ function ensureEventMemory(
         gameState.eventState
             .recentThemes = [];
     }
+
+    if (
+        !Array.isArray(
+            gameState.eventState
+                .recentPeople
+        )
+    ) {
+        gameState.eventState
+            .recentPeople = [];
+    }
+
+    if (
+        !Array.isArray(
+            gameState.eventState
+                .history
+        )
+    ) {
+        gameState.eventState
+            .history = [];
+    }
 }
 
 
-function isOnCooldown(
+function isPersonId(
     gameState,
-    event
+    id
 ) {
-    const lastYear =
-        gameState.eventState
-            .cooldowns[
-                event.id
-            ];
-
-    if (
-        lastYear === undefined ||
-        lastYear === null
-    ) {
+    if (!id) {
         return false;
     }
 
-    const cooldownYears =
-        Number(
-            event.cooldownYears
-        ) || 0;
+    const people =
+        gameState.people;
 
-    return (
-        gameState.calendar.year -
-        lastYear <
-        cooldownYears
-    );
+    if (
+        Array.isArray(
+            people
+        )
+    ) {
+        return people.some(
+            person =>
+                person?.id === id
+        );
+    }
+
+    if (
+        people &&
+        typeof people ===
+            "object"
+    ) {
+        if (
+            people[id]
+        ) {
+            return true;
+        }
+
+        if (
+            people.byId?.[id]
+        ) {
+            return true;
+        }
+
+        if (
+            Array.isArray(
+                people.list
+            )
+        ) {
+            return people.list
+                .some(
+                    person =>
+                        person?.id ===
+                        id
+                );
+        }
+    }
+
+    return false;
 }
 
 
-function isCompletedOnceOnly(
+function getEventPeople(
     gameState,
     event
 ) {
-    return (
-        event.onceOnly === true &&
-        gameState.eventState
-            .completed
-            .includes(
-                event.id
-            )
-    );
-}
+    const ids = new Set();
 
-
-function buildEvent(
-    gameState,
-    eventDefinition
-) {
-    if (
-        typeof eventDefinition ===
-        "function"
-    ) {
-        return eventDefinition(
-            gameState
-        );
-    }
-
-    return eventDefinition;
-}
-
-
-function filterCurrentYearDuplicates(
-    events,
-    excludeEventIds
-) {
-    if (
-        !Array.isArray(
-            excludeEventIds
-        ) ||
-        !excludeEventIds.length
-    ) {
-        return events;
-    }
-
-    const alternatives =
-        events.filter(
-            event =>
-                !excludeEventIds
-                    .includes(
-                        event.id
-                    )
-        );
-
-    return alternatives.length
-        ? alternatives
-        : events;
-}
-
-
-function filterRecentEventIds(
-    gameState,
-    events
-) {
-    const recent =
-        gameState.eventState
-            .recentEvents;
-
-    const alternatives =
-        events.filter(
-            event =>
-                !recent.includes(
-                    event.id
-                )
-        );
-
-    return alternatives.length
-        ? alternatives
-        : events;
-}
-
-
-function filterRecentThemes(
-    gameState,
-    events
-) {
-    const recentThemes =
-        gameState.eventState
-            .recentThemes;
-
-    const alternatives =
-        events.filter(
-            event => {
-                if (!event.theme) {
-                    return true;
-                }
-
-                return (
-                    !recentThemes.includes(
-                        event.theme
-                    )
-                );
+    (
+        event.personIds ??
+        []
+    ).forEach(
+        id => {
+            if (id) {
+                ids.add(id);
             }
-        );
+        }
+    );
 
-    return alternatives.length
-        ? alternatives
-        : events;
+    (
+        event.relatedPeople ??
+        []
+    ).forEach(
+        id => {
+            if (id) {
+                ids.add(id);
+            }
+        }
+    );
+
+    (
+        event.relatedEntities ??
+        []
+    ).forEach(
+        id => {
+            if (
+                isPersonId(
+                    gameState,
+                    id
+                )
+            ) {
+                ids.add(id);
+            }
+        }
+    );
+
+    return [
+        ...ids
+    ];
 }
 
 
@@ -216,7 +205,9 @@ function rememberValue(
             value
         );
 
-    if (existingIndex >= 0) {
+    if (
+        existingIndex >= 0
+    ) {
         array.splice(
             existingIndex,
             1
@@ -238,7 +229,8 @@ function rememberValue(
 
 function rememberEvent(
     gameState,
-    event
+    event,
+    resolutionType
 ) {
     ensureEventMemory(
         gameState
@@ -257,144 +249,494 @@ function rememberEvent(
         event.theme,
         RECENT_THEME_LIMIT
     );
+
+    getEventPeople(
+        gameState,
+        event
+    ).forEach(
+        personId => {
+            rememberValue(
+                gameState.eventState
+                    .recentPeople,
+                personId,
+                RECENT_PERSON_LIMIT
+            );
+        }
+    );
+
+    gameState.eventState
+        .history
+        .push({
+            eventId:
+                event.id,
+
+            theme:
+                event.theme ??
+                null,
+
+            year:
+                gameState.calendar
+                    .year,
+
+            age:
+                gameState.calendar
+                    .age,
+
+            people:
+                getEventPeople(
+                    gameState,
+                    event
+                ),
+
+            resolutionType
+        });
+
+    while (
+        gameState.eventState
+            .history
+            .length >
+        EVENT_HISTORY_LIMIT
+    ) {
+        gameState.eventState
+            .history
+            .shift();
+    }
 }
 
 
-export function getEligibleEvents(
+function buildEvent(
+    gameState,
+    definition
+) {
+    if (
+        typeof definition ===
+        "function"
+    ) {
+        return definition(
+            gameState
+        );
+    }
+
+    return definition;
+}
+
+
+function isOnCooldown(
+    gameState,
+    event
+) {
+    const lastYear =
+        gameState.eventState
+            .cooldowns[
+                event.id
+            ];
+
+    if (
+        lastYear ===
+            undefined ||
+        lastYear === null
+    ) {
+        return false;
+    }
+
+    const cooldown =
+        Number(
+            event.cooldownYears
+        ) || 0;
+
+    return (
+        gameState.calendar.year -
+        lastYear <
+        cooldown
+    );
+}
+
+
+function isOnceOnlyCompleted(
+    gameState,
+    event
+) {
+    return (
+        event.onceOnly === true &&
+        gameState.eventState
+            .completed
+            .includes(
+                event.id
+            )
+    );
+}
+
+
+function passesBaseRequirements(
+    gameState,
+    event
+) {
+    if (!event?.id) {
+        return false;
+    }
+
+    const age =
+        gameState.calendar.age;
+
+    if (
+        event.minAge !==
+            undefined &&
+        age <
+            event.minAge
+    ) {
+        return false;
+    }
+
+    if (
+        event.maxAge !==
+            undefined &&
+        age >
+            event.maxAge
+    ) {
+        return false;
+    }
+
+    if (
+        Array.isArray(
+            event.phases
+        ) &&
+        !event.phases
+            .includes(
+                gameState.calendar
+                    .phase
+            )
+    ) {
+        return false;
+    }
+
+    if (
+        isOnceOnlyCompleted(
+            gameState,
+            event
+        )
+    ) {
+        return false;
+    }
+
+    if (
+        isOnCooldown(
+            gameState,
+            event
+        )
+    ) {
+        return false;
+    }
+
+    if (
+        typeof event.canTrigger ===
+            "function" &&
+        !event.canTrigger(
+            gameState
+        )
+    ) {
+        return false;
+    }
+
+    return true;
+}
+
+
+export function getEventKind(
+    event
+) {
+    if (
+        event?.kind ===
+        "notification"
+    ) {
+        return "notification";
+    }
+
+    const choices =
+        event?.choices ??
+        [];
+
+    /*
+     * Uma única opção não é
+     * uma decisão real.
+     *
+     * Esses casos passam a ser
+     * tratados como notificação.
+     */
+    if (
+        choices.length <= 1
+    ) {
+        return "notification";
+    }
+
+    return "decision";
+}
+
+
+function calculateDynamicWeight(
+    gameState,
+    event,
+    excludeEventIds = []
+) {
+    ensureEventMemory(
+        gameState
+    );
+
+    let weight =
+        Math.max(
+            0.01,
+            Number(
+                event.weight
+            ) || 1
+        );
+
+    /*
+     * Mesmo evento recentemente:
+     * penalidade extremamente forte.
+     */
+    if (
+        gameState.eventState
+            .recentEvents
+            .includes(
+                event.id
+            )
+    ) {
+        weight *= 0.12;
+    }
+
+    /*
+     * Mesmo tema recentemente:
+     * reduz bastante a chance,
+     * sem tornar impossível.
+     */
+    if (
+        event.theme &&
+        gameState.eventState
+            .recentThemes
+            .includes(
+                event.theme
+            )
+    ) {
+        weight *= 0.38;
+    }
+
+    /*
+     * NPC utilizado recentemente.
+     *
+     * Isso resolve casos como
+     * Guilherme aparecer em vários
+     * acontecimentos consecutivos.
+     */
+    const people =
+        getEventPeople(
+            gameState,
+            event
+        );
+
+    const recentPeopleCount =
+        people.filter(
+            id =>
+                gameState.eventState
+                    .recentPeople
+                    .includes(
+                        id
+                    )
+        ).length;
+
+    if (
+        recentPeopleCount >
+        0
+    ) {
+        weight *=
+            Math.pow(
+                0.32,
+                recentPeopleCount
+            );
+    }
+
+    /*
+     * Não repetir o mesmo evento
+     * dentro do mesmo ano se houver
+     * outras opções.
+     */
+    if (
+        excludeEventIds
+            .includes(
+                event.id
+            )
+    ) {
+        weight *= 0.04;
+    }
+
+    if (
+        typeof event.weightModifier ===
+            "function"
+    ) {
+        const modifier =
+            Number(
+                event.weightModifier(
+                    gameState
+                )
+            );
+
+        if (
+            Number.isFinite(
+                modifier
+            )
+        ) {
+            weight *=
+                Math.max(
+                    0,
+                    modifier
+                );
+        }
+    }
+
+    return Math.max(
+        0.001,
+        weight
+    );
+}
+
+
+export function getEligibleNarrativeItems(
+    gameState,
+    eventDefinitions
+) {
+    ensureEventMemory(
+        gameState
+    );
+
+    return (
+        eventDefinitions ??
+        []
+    )
+        .map(
+            definition =>
+                buildEvent(
+                    gameState,
+                    definition
+                )
+        )
+        .filter(Boolean)
+        .filter(
+            event =>
+                passesBaseRequirements(
+                    gameState,
+                    event
+                )
+        )
+        .filter(
+            event => {
+                const kind =
+                    getEventKind(
+                        event
+                    );
+
+                if (
+                    kind ===
+                    "decision"
+                ) {
+                    return (
+                        Array.isArray(
+                            event.choices
+                        ) &&
+                        event.choices
+                            .length >=
+                            2
+                    );
+                }
+
+                return (
+                    typeof event.apply ===
+                        "function" ||
+                    (
+                        Array.isArray(
+                            event.choices
+                        ) &&
+                        event.choices
+                            .length ===
+                            1
+                    )
+                );
+            }
+        );
+}
+
+
+export function drawNarrativeItem(
     gameState,
     eventDefinitions,
     {
         excludeEventIds = []
     } = {}
 ) {
-    ensureEventMemory(
-        gameState
-    );
+    const eligible =
+        getEligibleNarrativeItems(
+            gameState,
+            eventDefinitions
+        );
 
-    let eligible =
-        (
-            eventDefinitions ??
-            []
-        )
-            .map(
-                definition =>
-                    buildEvent(
-                        gameState,
-                        definition
-                    )
-            )
-            .filter(Boolean)
-            .filter(
-                event => {
-                    const age =
-                        gameState.calendar.age;
+    if (
+        !eligible.length
+    ) {
+        return null;
+    }
 
-                    if (
-                        event.minAge !==
-                            undefined &&
-                        age <
-                            event.minAge
-                    ) {
-                        return false;
-                    }
-
-                    if (
-                        event.maxAge !==
-                            undefined &&
-                        age >
-                            event.maxAge
-                    ) {
-                        return false;
-                    }
-
-                    if (
-                        Array.isArray(
-                            event.phases
-                        ) &&
-                        !event.phases
-                            .includes(
-                                gameState
-                                    .calendar
-                                    .phase
-                            )
-                    ) {
-                        return false;
-                    }
-
-                    if (
-                        isCompletedOnceOnly(
-                            gameState,
-                            event
-                        )
-                    ) {
-                        return false;
-                    }
-
-                    if (
-                        isOnCooldown(
-                            gameState,
-                            event
-                        )
-                    ) {
-                        return false;
-                    }
-
-                    if (
-                        typeof event.canTrigger ===
-                            "function" &&
-                        !event.canTrigger(
-                            gameState
-                        )
-                    ) {
-                        return false;
-                    }
-
-                    if (
-                        !Array.isArray(
-                            event.choices
-                        ) ||
-                        event.choices
-                            .length === 0
-                    ) {
-                        return false;
-                    }
-
-                    return true;
-                }
-            );
-
-    eligible =
-        filterCurrentYearDuplicates(
+    const event =
+        weightedPick(
+            gameState.rng,
             eligible,
-            excludeEventIds
+            current =>
+                calculateDynamicWeight(
+                    gameState,
+                    current,
+                    excludeEventIds
+                )
         );
 
-    eligible =
-        filterRecentEventIds(
-            gameState,
-            eligible
-        );
+    if (!event) {
+        return null;
+    }
 
-    eligible =
-        filterRecentThemes(
-            gameState,
-            eligible
-        );
+    return {
+        kind:
+            getEventKind(
+                event
+            ),
 
-    return eligible;
+        event
+    };
+}
+
+
+export function getEligibleEvents(
+    gameState,
+    eventDefinitions
+) {
+    return getEligibleNarrativeItems(
+        gameState,
+        eventDefinitions
+    ).filter(
+        event =>
+            getEventKind(
+                event
+            ) ===
+            "decision"
+    );
 }
 
 
 export function drawEvent(
     gameState,
     eventDefinitions,
-    options = {}
+    {
+        excludeEventIds = []
+    } = {}
 ) {
     const eligible =
         getEligibleEvents(
             gameState,
-            eventDefinitions,
-            options
+            eventDefinitions
         );
 
     if (!eligible.length) {
@@ -405,55 +747,22 @@ export function drawEvent(
         gameState.rng,
         eligible,
         event =>
-            Number(
-                event.weight
-            ) || 1
+            calculateDynamicWeight(
+                gameState,
+                event,
+                excludeEventIds
+            )
     );
 }
 
 
-export function resolveEventChoice(
+function finishEventRecord(
     gameState,
     event,
-    choiceId
+    description,
+    resolutionType,
+    metadata = {}
 ) {
-    ensureEventMemory(
-        gameState
-    );
-
-    if (!event) {
-        throw new Error(
-            "Evento inválido."
-        );
-    }
-
-    const choice =
-        event.choices
-            ?.find(
-                current =>
-                    current.id ===
-                    choiceId
-            );
-
-    if (!choice) {
-        throw new Error(
-            `Escolha inválida: ${choiceId}`
-        );
-    }
-
-    let result = null;
-
-    if (
-        typeof choice.apply ===
-        "function"
-    ) {
-        result =
-            choice.apply(
-                gameState,
-                event
-            );
-    }
-
     gameState.eventState
         .cooldowns[
             event.id
@@ -477,7 +786,8 @@ export function resolveEventChoice(
 
     rememberEvent(
         gameState,
-        event
+        event,
+        resolutionType
     );
 
     addTimelineEntry(
@@ -489,9 +799,7 @@ export function resolveEventChoice(
             title:
                 event.title,
 
-            description:
-                choice.resultText ??
-                `Decisão tomada: ${choice.label}.`,
+            description,
 
             importance:
                 event.importance ??
@@ -509,9 +817,78 @@ export function resolveEventChoice(
                     event.theme ??
                     null,
 
-                choiceId:
-                    choice.id
+                resolutionType,
+
+                ...metadata
             }
+        }
+    );
+}
+
+
+export function resolveEventChoice(
+    gameState,
+    event,
+    choiceId
+) {
+    ensureEventMemory(
+        gameState
+    );
+
+    if (!event) {
+        throw new Error(
+            "Evento inválido."
+        );
+    }
+
+    const choices =
+        event.choices ??
+        [];
+
+    if (
+        choices.length <
+        2
+    ) {
+        throw new Error(
+            "Este acontecimento é uma notificação, não uma decisão."
+        );
+    }
+
+    const choice =
+        choices.find(
+            current =>
+                current.id ===
+                choiceId
+        );
+
+    if (!choice) {
+        throw new Error(
+            `Escolha inválida: ${choiceId}`
+        );
+    }
+
+    let result = null;
+
+    if (
+        typeof choice.apply ===
+        "function"
+    ) {
+        result =
+            choice.apply(
+                gameState,
+                event
+            );
+    }
+
+    finishEventRecord(
+        gameState,
+        event,
+        choice.resultText ??
+            `Decisão tomada: ${choice.label}.`,
+        "decision",
+        {
+            choiceId:
+                choice.id
         }
     );
 
@@ -521,6 +898,70 @@ export function resolveEventChoice(
 
         choiceId:
             choice.id,
+
+        result
+    };
+}
+
+
+export function resolveEventNotification(
+    gameState,
+    event
+) {
+    ensureEventMemory(
+        gameState
+    );
+
+    if (!event) {
+        throw new Error(
+            "Notificação inválida."
+        );
+    }
+
+    let result = null;
+
+    if (
+        typeof event.apply ===
+        "function"
+    ) {
+        result =
+            event.apply(
+                gameState,
+                event
+            );
+    } else {
+        const onlyChoice =
+            event.choices?.[0];
+
+        if (
+            typeof onlyChoice
+                ?.apply ===
+                "function"
+        ) {
+            result =
+                onlyChoice.apply(
+                    gameState,
+                    event
+                );
+        }
+    }
+
+    const onlyChoice =
+        event.choices?.[0];
+
+    finishEventRecord(
+        gameState,
+        event,
+        event.resultText ??
+            onlyChoice?.resultText ??
+            event.description ??
+            event.title,
+        "notification"
+    );
+
+    return {
+        eventId:
+            event.id,
 
         result
     };

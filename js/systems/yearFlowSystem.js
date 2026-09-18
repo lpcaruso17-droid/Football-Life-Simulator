@@ -11,9 +11,9 @@ import {
 } from "../core/timeEngine.js";
 
 import {
-    drawEvent,
-    getEligibleEvents,
-    resolveEventChoice
+    drawNarrativeItem,
+    resolveEventChoice,
+    resolveEventNotification
 } from "../core/eventEngine.js";
 
 import {
@@ -47,6 +47,10 @@ import {
 import {
     PROFESSIONAL_EVENTS
 } from "../events/professional.js";
+
+import {
+    PROFESSIONAL_LIFE_EVENTS
+} from "../events/professionalLife.js";
 
 import {
     simulateFootballSeason
@@ -101,7 +105,17 @@ function calculateTargetEvents(
         maximum = 5;
     }
 
-    if (age >= 18) {
+    if (
+        age >= 18 &&
+        age <= 24
+    ) {
+        minimum = 4;
+        maximum = 6;
+    }
+
+    if (
+        age >= 25
+    ) {
         minimum = 4;
         maximum = 5;
     }
@@ -133,7 +147,7 @@ function calculateTargetEvents(
                 minimum,
                 maximum
             ),
-            6
+            7
         );
 
     return randomInt(
@@ -145,9 +159,9 @@ function calculateTargetEvents(
 
 
 function distributeEventsAcrossPhases(
-    targetEvents
+    total
 ) {
-    const distribution = {
+    const result = {
         preseason: 0,
         early_season: 0,
         mid_season: 0,
@@ -155,7 +169,7 @@ function distributeEventsAcrossPhases(
         offseason: 0
     };
 
-    const priorityOrder = [
+    const order = [
         "preseason",
         "mid_season",
         "offseason",
@@ -164,7 +178,7 @@ function distributeEventsAcrossPhases(
     ];
 
     let remaining =
-        targetEvents;
+        total;
 
     let index = 0;
 
@@ -172,21 +186,20 @@ function distributeEventsAcrossPhases(
         remaining > 0
     ) {
         const phase =
-            priorityOrder[
+            order[
                 index %
-                priorityOrder.length
+                order.length
             ];
 
-        distribution[
+        result[
             phase
         ] += 1;
 
-        remaining--;
-
-        index++;
+        remaining -= 1;
+        index += 1;
     }
 
-    return distribution;
+    return result;
 }
 
 
@@ -230,8 +243,7 @@ function createRuntimeFlow(
 
         currentEvent: null,
 
-        currentEventResolved:
-            false,
+        currentKind: null,
 
         completed: false,
 
@@ -280,6 +292,20 @@ function getOrCreateRuntimeFlow(
 }
 
 
+function isProfessional(
+    gameState
+) {
+    return Boolean(
+        gameState.player
+            .football
+            .isProfessional ||
+        gameState.player
+            .football
+            .hasDebutedProfessionally
+    );
+}
+
+
 function getGeneralEventPool(
     gameState
 ) {
@@ -302,10 +328,23 @@ function getGeneralEventPool(
     if (
         gameState.player
             .football
-            .currentClubId
+            .currentClubId &&
+        !isProfessional(
+            gameState
+        )
     ) {
         pool.push(
             ...ACADEMY_EVENTS
+        );
+    }
+
+    if (
+        isProfessional(
+            gameState
+        )
+    ) {
+        pool.push(
+            ...PROFESSIONAL_LIFE_EVENTS
         );
     }
 
@@ -313,97 +352,78 @@ function getGeneralEventPool(
 }
 
 
-function findForcedHousingEvent(
+function getForcedHousingItem(
     gameState,
     flow
 ) {
-    const eligible =
-        getEligibleEvents(
-            gameState,
-            HOUSING_EVENTS,
-            {
-                excludeEventIds:
-                    flow.eventsSeen
-            }
-        );
+    if (
+        !gameState.housing
+            ?.pendingRelocation
+    ) {
+        return null;
+    }
 
-    return (
-        eligible[0] ??
-        null
+    return drawNarrativeItem(
+        gameState,
+        HOUSING_EVENTS,
+        {
+            excludeEventIds:
+                flow.eventsSeen
+        }
     );
 }
 
 
-function getProfessionalMilestoneEvents(
-    gameState
+function getProfessionalMilestoneItem(
+    gameState,
+    flow
 ) {
     if (
         !gameState.player
             .football
             .currentClubId
     ) {
-        return [];
+        return null;
     }
 
-    return PROFESSIONAL_EVENTS
-        .map(
-            definition =>
-                typeof definition ===
-                    "function"
-                    ? definition(
-                        gameState
-                    )
-                    : definition
-        )
-        .filter(Boolean)
-        .filter(
-            event =>
-                event.category ===
-                    "professional"
-        );
+    return drawNarrativeItem(
+        gameState,
+        PROFESSIONAL_EVENTS,
+        {
+            excludeEventIds:
+                flow.eventsSeen
+        }
+    );
 }
 
 
-function choosePhaseEvent(
+function chooseNarrativeItem(
     gameState,
     flow
 ) {
-    const housingEvent =
-        findForcedHousingEvent(
+    const housing =
+        getForcedHousingItem(
             gameState,
             flow
         );
 
-    if (housingEvent) {
-        return housingEvent;
+    if (housing) {
+        return housing;
     }
 
 
-    const professionalEvents =
-        getProfessionalMilestoneEvents(
-            gameState
+    const milestone =
+        getProfessionalMilestoneItem(
+            gameState,
+            flow
         );
 
-    if (
-        professionalEvents.length
-    ) {
-        const professionalEvent =
-            drawEvent(
-                gameState,
-                professionalEvents,
-                {
-                    excludeEventIds:
-                        flow.eventsSeen
-                }
-            );
-
-        if (professionalEvent) {
-            return professionalEvent;
-        }
+    if (milestone) {
+        return milestone;
     }
 
 
-    return drawEvent(
+    return drawNarrativeItem(
         gameState,
         getGeneralEventPool(
             gameState
@@ -418,6 +438,7 @@ function choosePhaseEvent(
 
 function createYearSummary(
     gameState,
+    flow,
     {
         season = null,
         academyDecision = null
@@ -445,10 +466,7 @@ function createYearSummary(
         academyDecision,
 
         eventsExperienced:
-            gameState.eventState
-                .recentEvents
-                ?.length ??
-            0,
+            flow.totalEventsResolved,
 
         happiness:
             gameState.player
@@ -493,7 +511,7 @@ function finalizeYear(
     }
 
 
-    const isStillAcademyPlayer =
+    const isAcademyPlayer =
         Boolean(
             gameState.academy
                 .currentClubId
@@ -503,7 +521,7 @@ function finalizeYear(
             .hasDebutedProfessionally;
 
 
-    if (isStillAcademyPlayer) {
+    if (isAcademyPlayer) {
         academyDecision =
             resolveAnnualAcademyEvaluation(
                 gameState
@@ -524,6 +542,7 @@ function finalizeYear(
     const summary =
         createYearSummary(
             gameState,
+            flow,
             {
                 season,
                 academyDecision
@@ -551,10 +570,12 @@ function finalizeYear(
 
             metadata: {
                 year:
-                    gameState.calendar.year,
+                    gameState.calendar
+                        .year,
 
                 age:
-                    gameState.calendar.age,
+                    gameState.calendar
+                        .age,
 
                 eventsExperienced:
                     flow.totalEventsResolved,
@@ -590,17 +611,78 @@ function finalizeYear(
 }
 
 
+function completeCurrentNarrativeItem(
+    gameState,
+    flow
+) {
+    const phase =
+        gameState.calendar
+            .phase;
+
+    const event =
+        flow.currentEvent;
+
+    if (
+        event &&
+        !flow.eventsSeen
+            .includes(
+                event.id
+            )
+    ) {
+        flow.eventsSeen.push(
+            event.id
+        );
+    }
+
+    flow.totalEventsResolved +=
+        1;
+
+    flow.phaseEventCounts[
+        phase
+    ] =
+        (
+            flow.phaseEventCounts[
+                phase
+            ] ??
+            0
+        ) +
+        1;
+
+    flow.currentEvent =
+        null;
+
+    flow.currentKind =
+        null;
+
+
+    const target =
+        flow.phaseEventTargets[
+            phase
+        ] ?? 0;
+
+    const completed =
+        flow.phaseEventCounts[
+            phase
+        ] ?? 0;
+
+    if (
+        completed >=
+        target
+    ) {
+        flow.phaseIndex +=
+            1;
+    }
+}
+
+
 export function startYearFlow(
     gameState
 ) {
-    const flow =
-        getOrCreateRuntimeFlow(
-            gameState
-        );
-
     return getNextYearStep(
         gameState,
-        flow
+        getOrCreateRuntimeFlow(
+            gameState
+        )
     );
 }
 
@@ -630,13 +712,14 @@ export function getNextYearStep(
 
 
     if (
-        flow.currentEvent &&
-        !flow
-            .currentEventResolved
+        flow.currentEvent
     ) {
         return {
             type:
-                "event",
+                flow.currentKind ===
+                    "notification"
+                    ? "notification"
+                    : "event",
 
             phase:
                 gameState.calendar
@@ -678,33 +761,39 @@ export function getNextYearStep(
             completed <
             target
         ) {
-            const event =
-                choosePhaseEvent(
+            const item =
+                chooseNarrativeItem(
                     gameState,
                     flow
                 );
 
-            if (event) {
+            if (item) {
                 flow.currentEvent =
-                    event;
+                    item.event;
 
-                flow.currentEventResolved =
-                    false;
+                flow.currentKind =
+                    item.kind;
 
                 return {
                     type:
-                        "event",
+                        item.kind ===
+                            "notification"
+                            ? "notification"
+                            : "event",
 
                     phase,
 
-                    event
+                    event:
+                        item.event
                 };
             }
 
             /*
-             * Se não houver nenhum
-             * evento válido, essa vaga
-             * do calendário é ignorada.
+             * Nenhum conteúdo válido
+             * para esta fase.
+             *
+             * Não inventamos um evento
+             * apenas para preencher espaço.
              */
             flow.phaseEventCounts[
                 phase
@@ -734,84 +823,68 @@ export function resolveCurrentYearEvent(
             gameState
         );
 
-
     if (
-        !flow.currentEvent
+        !flow.currentEvent ||
+        flow.currentKind !==
+            "decision"
     ) {
         throw new Error(
-            "Nenhum evento aguardando decisão."
+            "Nenhuma decisão está aguardando resposta."
         );
     }
-
-
-    const event =
-        flow.currentEvent;
-
-    const currentPhase =
-        gameState.calendar.phase;
-
 
     const resolution =
         resolveEventChoice(
             gameState,
-            event,
+            flow.currentEvent,
             choiceId
         );
 
+    completeCurrentNarrativeItem(
+        gameState,
+        flow
+    );
+
+    return {
+        resolution,
+
+        nextStep:
+            getNextYearStep(
+                gameState,
+                flow
+            )
+    };
+}
+
+
+export function resolveCurrentYearNotification(
+    gameState
+) {
+    const flow =
+        getOrCreateRuntimeFlow(
+            gameState
+        );
 
     if (
-        !flow.eventsSeen
-            .includes(
-                event.id
-            )
+        !flow.currentEvent ||
+        flow.currentKind !==
+            "notification"
     ) {
-        flow.eventsSeen.push(
-            event.id
+        throw new Error(
+            "Nenhuma notificação está aguardando continuação."
         );
     }
 
+    const resolution =
+        resolveEventNotification(
+            gameState,
+            flow.currentEvent
+        );
 
-    flow.totalEventsResolved +=
-        1;
-
-    flow.phaseEventCounts[
-        currentPhase
-    ] =
-        (
-            flow.phaseEventCounts[
-                currentPhase
-            ] ??
-            0
-        ) +
-        1;
-
-
-    flow.currentEventResolved =
-        true;
-
-    flow.currentEvent =
-        null;
-
-
-    const target =
-        flow.phaseEventTargets[
-            currentPhase
-        ] ?? 0;
-
-    const completed =
-        flow.phaseEventCounts[
-            currentPhase
-        ] ?? 0;
-
-
-    if (
-        completed >=
-        target
-    ) {
-        flow.phaseIndex +=
-            1;
-    }
-
+    completeCurrentNarrativeItem(
+        gameState,
+        flow
+    );
 
     return {
         resolution,

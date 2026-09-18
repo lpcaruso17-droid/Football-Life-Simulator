@@ -6,6 +6,7 @@ import {
 import {
     startYearFlow,
     resolveCurrentYearEvent,
+    resolveCurrentYearNotification,
     clearYearFlow
 } from "../systems/yearFlowSystem.js";
 
@@ -155,6 +156,7 @@ function renderEventStep(
     root.innerHTML = `
         <main class="app-shell page">
             <div class="eyebrow">
+                DECISÃO ·
                 ${escapeHtml(
                     getPhaseLabel(
                         step.phase
@@ -247,7 +249,6 @@ function renderEventStep(
                                         choiceId
                                     );
 
-
                                 saveGame(
                                     game,
                                     {
@@ -255,7 +256,6 @@ function renderEventStep(
                                             "year_event_choice"
                                     }
                                 );
-
 
                                 renderYearStep(
                                     root,
@@ -277,6 +277,123 @@ function renderEventStep(
                             }
                         }
                     );
+            }
+        );
+}
+
+
+function renderNotificationStep(
+    root,
+    game,
+    step
+) {
+    const event =
+        step.event;
+
+    root.innerHTML = `
+        <main class="app-shell page">
+            <div class="eyebrow">
+                ACONTECIMENTO ·
+                ${escapeHtml(
+                    getPhaseLabel(
+                        step.phase
+                    )
+                )}
+            </div>
+
+            <h1 class="page-title">
+                ${escapeHtml(
+                    event.title
+                )}
+            </h1>
+
+            <p class="page-subtitle">
+                ${escapeHtml(
+                    event.description
+                )}
+            </p>
+
+            ${renderProgress(
+                step.phase
+            )}
+
+            <section class="year-event-card">
+                <div class="year-event-meta">
+                    ${escapeHtml(
+                        game.calendar.year
+                    )}
+
+                    ·
+
+                    ${escapeHtml(
+                        game.calendar.age
+                    )}
+                    anos
+                </div>
+
+                <p
+                    class="muted"
+                    style="
+                        margin-bottom: 22px;
+                        max-width: 700px;
+                    "
+                >
+                    Este é um acontecimento da sua história,
+                    não uma escolha. A consequência será registrada
+                    quando você continuar.
+                </p>
+
+                <button
+                    id="continue-notification"
+                    class="btn btn-primary"
+                    type="button"
+                >
+                    CONTINUAR
+                </button>
+            </section>
+        </main>
+    `;
+
+
+    root
+        .querySelector(
+            "#continue-notification"
+        )
+        ?.addEventListener(
+            "click",
+            () => {
+                try {
+                    const result =
+                        resolveCurrentYearNotification(
+                            game
+                        );
+
+                    saveGame(
+                        game,
+                        {
+                            reason:
+                                "year_notification"
+                        }
+                    );
+
+                    renderYearStep(
+                        root,
+                        game,
+                        result.nextStep
+                    );
+                } catch (
+                    error
+                ) {
+                    console.error(
+                        error
+                    );
+
+                    window.alert(
+                        error
+                            ?.message ??
+                        "Não foi possível continuar."
+                    );
+                }
             }
         );
 }
@@ -319,6 +436,15 @@ function renderYearSummary(
                     game.calendar.age
                 )}
                 anos.
+
+                ·
+
+                ${escapeHtml(
+                    summary.eventsExperienced ??
+                    0
+                )}
+                acontecimento(s) relevante(s)
+                neste ano.
             </p>
 
             <section class="year-summary-grid">
@@ -591,6 +717,20 @@ function renderYearStep(
         "event"
     ) {
         renderEventStep(
+            root,
+            game,
+            step
+        );
+
+        return;
+    }
+
+
+    if (
+        step.type ===
+        "notification"
+    ) {
+        renderNotificationStep(
             root,
             game,
             step
