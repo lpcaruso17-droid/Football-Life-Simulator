@@ -26,6 +26,15 @@ import {
     showToast
 } from "./ui/feedback.js";
 
+import {
+    loadActiveGame,
+    saveGame
+} from "./core/saveManager.js";
+
+import {
+    refreshProfessionalMarket
+} from "./systems/professionalMarketSystem.js";
+
 
 function registerGlobalFeedback() {
     window.addEventListener(
@@ -62,11 +71,47 @@ function registerGlobalFeedback() {
 }
 
 
+function renderDashboardWithMarket(
+    root
+) {
+    const game =
+        loadActiveGame();
+
+
+    if (game) {
+        const marketRefresh =
+            refreshProfessionalMarket(
+                game
+            );
+
+
+        if (
+            marketRefresh
+                .processed
+        ) {
+            saveGame(
+                game,
+                {
+                    reason:
+                        "professional_market_refresh"
+                }
+            );
+        }
+    }
+
+
+    renderDashboardView(
+        root
+    );
+}
+
+
 function bootstrap() {
     const root =
         document.querySelector(
             "#app"
         );
+
 
     registerGlobalFeedback();
 
@@ -85,7 +130,7 @@ function bootstrap() {
                 renderCreationView,
 
             dashboard:
-                renderDashboardView,
+                renderDashboardWithMarket,
 
             year:
                 renderYearView,

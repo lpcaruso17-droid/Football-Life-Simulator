@@ -12,6 +12,28 @@ import {
 } from "./timelineSystem.js";
 
 
+function getRelocationClub(
+    gameState
+) {
+    const clubId =
+        gameState.housing
+            ?.clubId ??
+        gameState.academy
+            ?.currentClubId ??
+        gameState.player
+            ?.football
+            ?.currentClubId ??
+        null;
+
+    return clubId
+        ? getClub(
+            gameState,
+            clubId
+        )
+        : null;
+}
+
+
 export function initializeHousing(
     gameState
 ) {
@@ -117,10 +139,8 @@ export function resolveRelocationDecision(
     }
 
     const club =
-        getClub(
-            gameState,
-            gameState.academy
-                .currentClubId
+        getRelocationClub(
+            gameState
         );
 
     if (!club) {
@@ -428,9 +448,194 @@ export function resolveRelocationDecision(
 }
 
 
+export function relocateProfessionalPlayerToClub(
+    gameState,
+    club,
+    {
+        reason =
+            "professional_transfer"
+    } = {}
+) {
+    if (
+        !club?.id ||
+        !club?.cityId
+    ) {
+        throw new Error(
+            "Clube inválido para mudança profissional."
+        );
+    }
+
+    const previousCityId =
+        gameState.player
+            ?.identity
+            ?.currentCityId ??
+        null;
+
+    gameState.housing =
+        gameState.housing ??
+        {};
+
+    gameState.housing.history =
+        Array.isArray(
+            gameState.housing.history
+        )
+            ? gameState.housing.history
+            : [];
+
+    if (
+        !gameState.housing
+            .familyCityId
+    ) {
+        gameState.housing
+            .familyCityId =
+            previousCityId;
+    }
+
+    gameState.player
+        .identity
+        .currentCityId =
+        club.cityId;
+
+    gameState.housing.type =
+        "professional_housing";
+
+    gameState.housing.cityId =
+        club.cityId;
+
+    gameState.housing.clubId =
+        club.id;
+
+    gameState.housing.quality =
+        club.housing ??
+        gameState.housing
+            .quality ??
+        65;
+
+    gameState.housing
+        .familyMoved =
+        false;
+
+    gameState.housing
+        .pendingRelocation =
+        false;
+
+    gameState.housing
+        .sinceYear =
+        gameState.calendar.year;
+
+    if (
+        gameState.academy
+    ) {
+        gameState.academy
+            .relocationRequired =
+            false;
+
+        gameState.academy
+            .housingMode =
+            "professional_housing";
+    }
+
+    if (
+        gameState.education &&
+        !gameState.education
+            .completedHighSchool &&
+        gameState.education
+            .cityId !==
+            club.cityId
+    ) {
+        relocateEducationToCity(
+            gameState,
+            club.cityId,
+            {
+                reason
+            }
+        );
+    }
+
+    gameState.housing
+        .history
+        .push({
+            year:
+                gameState.calendar
+                    .year,
+
+            age:
+                gameState.calendar
+                    .age,
+
+            action:
+                "professional_relocation",
+
+            type:
+                "professional_housing",
+
+            previousCityId,
+
+            cityId:
+                club.cityId,
+
+            clubId:
+                club.id,
+
+            reason
+        });
+
+    if (
+        previousCityId !==
+        club.cityId
+    ) {
+        addTimelineEntry(
+            gameState,
+            {
+                type:
+                    "professional_relocation",
+
+                title:
+                    "Mudança de cidade",
+
+                description:
+                    `${gameState.player.identity.fullName} mudou de cidade para iniciar sua nova etapa profissional no ${club.name}.`,
+
+                importance: 6,
+
+                relatedEntities: [
+                    club.id
+                ],
+
+                metadata: {
+                    previousCityId,
+
+                    cityId:
+                        club.cityId,
+
+                    reason
+                }
+            }
+        );
+    }
+
+    return {
+        previousCityId,
+
+        cityId:
+            club.cityId,
+
+        clubId:
+            club.id
+    };
+}
+
+
 export function getHousingDescription(
     gameState
 ) {
+    if (
+        gameState.housing.type ===
+        "professional_housing"
+    ) {
+        return "Moradia na cidade do clube";
+    }
+
     if (
         gameState.housing.type ===
         "club_housing"

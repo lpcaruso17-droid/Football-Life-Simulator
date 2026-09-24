@@ -1,25 +1,14 @@
-import {
-    randomInt
-} from "../core/rng.js";
-
-import {
-    getClub
-} from "./academySystem.js";
-
-import {
-    getAgentNegotiationModifier
-} from "./agentSystem.js";
-
-import {
-    addTimelineEntry
-} from "./timelineSystem.js";
-
+import { randomInt } from "../core/rng.js";
+import { getClub } from "./academySystem.js";
+import { getAgentNegotiationModifier } from "./agentSystem.js";
+import { addTimelineEntry } from "./timelineSystem.js";
+import { synchronizeFootballState } from "./footballStatusSystem.js";
+import { relocateEducationToCity } from "./educationSystem.js";
 
 function createId(prefix) {
     if (
         typeof crypto !== "undefined" &&
-        typeof crypto.randomUUID ===
-            "function"
+        typeof crypto.randomUUID === "function"
     ) {
         return `${prefix}_${crypto.randomUUID()}`;
     }
@@ -29,7 +18,6 @@ function createId(prefix) {
         .slice(2)}`;
 }
 
-
 function roundMoney(value) {
     return (
         Math.round(
@@ -38,13 +26,10 @@ function roundMoney(value) {
     );
 }
 
-
-function getNegotiatedBy(
-    gameState
-) {
+function getNegotiatedBy(gameState) {
     if (
         gameState.representation
-            .currentAgentPersonId
+            ?.currentAgentPersonId
     ) {
         return "agent";
     }
@@ -59,6 +44,468 @@ function getNegotiatedBy(
     return "player";
 }
 
+function ensureCareerState(
+    gameState
+) {
+    gameState.career =
+        gameState.career ??
+        {};
+
+    gameState.career.clubHistory =
+        Array.isArray(
+            gameState.career
+                .clubHistory
+        )
+            ? gameState.career
+                .clubHistory
+            : [];
+
+    gameState.career.milestones =
+        Array.isArray(
+            gameState.career
+                .milestones
+        )
+            ? gameState.career
+                .milestones
+            : [];
+}
+
+function closeOpenClubHistory(
+    gameState,
+    reason
+) {
+    ensureCareerState(
+        gameState
+    );
+
+    const openEntry =
+        [
+            ...gameState.career
+                .clubHistory
+        ]
+            .reverse()
+            .find(
+                entry =>
+                    entry.leftYear ===
+                        null ||
+                    entry.leftYear ===
+                        undefined
+            );
+
+    if (!openEntry) {
+        return null;
+    }
+
+    openEntry.leftYear =
+        gameState.calendar.year;
+
+    openEntry.leftAge =
+        gameState.calendar.age;
+
+    openEntry.reasonLeft =
+        reason;
+
+    return openEntry;
+}
+
+function openClubHistory(
+    gameState,
+    club,
+    reason
+) {
+    ensureCareerState(
+        gameState
+    );
+
+    const alreadyOpen =
+        [
+            ...gameState.career
+                .clubHistory
+        ]
+            .reverse()
+            .find(
+                entry =>
+                    entry.clubId ===
+                        club.id &&
+                    (
+                        entry.leftYear ===
+                            null ||
+                        entry.leftYear ===
+                            undefined
+                    )
+            );
+
+    if (alreadyOpen) {
+        return alreadyOpen;
+    }
+
+    const entry = {
+        clubId:
+            club.id,
+
+        clubName:
+            club.name,
+
+        joinedYear:
+            gameState.calendar.year,
+
+        joinedAge:
+            gameState.calendar.age,
+
+        leftYear: null,
+
+        leftAge: null,
+
+        reasonJoined:
+            reason,
+
+        reasonLeft:
+            null
+    };
+
+    gameState.career
+        .clubHistory
+        .push(
+            entry
+        );
+
+    return entry;
+}
+
+function resetClubContext(
+    gameState
+) {
+    gameState.footballContext =
+        gameState.footballContext ??
+        {};
+
+    gameState.footballContext
+        .currentCoachId =
+        null;
+
+    gameState.footballContext
+        .coachTrust =
+        45;
+
+    gameState.footballContext
+        .form =
+        50;
+
+    gameState.footballContext
+        .positionCompetition =
+        0;
+
+    gameState.footballContext
+        .currentSeasonId =
+        null;
+}
+
+function relocateProfessionalPlayer(
+    gameState,
+    club,
+    previousClubId
+) {
+    if (
+        previousClubId ===
+            club.id ||
+        !club.cityId
+    ) {
+        return null;
+    }
+
+    const previousCityId =
+        gameState.player
+            ?.identity
+            ?.currentCityId ??
+        null;
+
+    if (
+        previousCityId ===
+        club.cityId
+    ) {
+        if (
+            gameState.housing
+        ) {
+            gameState.housing
+                .clubId =
+                club.id;
+
+            gameState.housing
+                .pendingRelocation =
+                false;
+        }
+
+        return {
+            changedCity: false,
+
+            previousCityId,
+
+            newCityId:
+                club.cityId
+        };
+    }
+
+    gameState.player
+        .identity
+        .currentCityId =
+        club.cityId;
+
+    if (
+        gameState.housing
+    ) {
+        gameState.housing.history =
+            Array.isArray(
+                gameState.housing
+                    .history
+            )
+                ? gameState.housing
+                    .history
+                : [];
+
+        gameState.housing
+            .cityId =
+            club.cityId;
+
+        gameState.housing
+            .clubId =
+            club.id;
+
+        gameState.housing
+            .pendingRelocation =
+            false;
+
+        gameState.housing
+            .familyMoved =
+            false;
+
+        gameState.housing
+            .type =
+            "club_housing";
+
+        gameState.housing
+            .sinceYear =
+            gameState.calendar.year;
+
+        gameState.housing
+            .history
+            .push({
+                year:
+                    gameState
+                        .calendar
+                        .year,
+
+                age:
+                    gameState
+                        .calendar
+                        .age,
+
+                action:
+                    "professional_club_relocation",
+
+                previousCityId,
+
+                cityId:
+                    club.cityId,
+
+                clubId:
+                    club.id,
+
+                familyMoved:
+                    false
+            });
+    }
+
+    if (
+        gameState.calendar.age <=
+            17 &&
+        gameState.education &&
+        gameState.education
+            .cityId !==
+            club.cityId
+    ) {
+        relocateEducationToCity(
+            gameState,
+            club.cityId,
+            {
+                reason:
+                    "professional_transfer"
+            }
+        );
+    }
+
+    return {
+        changedCity: true,
+
+        previousCityId,
+
+        newCityId:
+            club.cityId
+    };
+}
+
+function movePlayerToProfessionalClub(
+    gameState,
+    offer
+) {
+    const club =
+        getClub(
+            gameState,
+            offer.clubId
+        );
+
+    if (!club) {
+        throw new Error(
+            "Clube da proposta profissional não encontrado."
+        );
+    }
+
+    const previousClubId =
+        gameState.player
+            .football
+            .currentClubId ??
+        null;
+
+    const changedClub =
+        previousClubId !==
+        club.id;
+
+    if (changedClub) {
+        if (
+            previousClubId
+        ) {
+            closeOpenClubHistory(
+                gameState,
+                offer.moveType ===
+                    "transfer"
+                    ? "professional_transfer"
+                    : "professional_move"
+            );
+        }
+
+        openClubHistory(
+            gameState,
+            club,
+            offer.moveType ===
+                "free_agent"
+                ? "signed_as_free_agent"
+                : "professional_transfer"
+        );
+
+        resetClubContext(
+            gameState
+        );
+    }
+
+    gameState.player
+        .football
+        .currentClubId =
+        club.id;
+
+    gameState.player
+        .football
+        .currentClubName =
+        club.name;
+
+    gameState.player
+        .football
+        .currentCategory =
+        "professional";
+
+    gameState.player
+        .football
+        .squadStatus =
+        "evaluation";
+
+    gameState.academy =
+        gameState.academy ??
+        {};
+
+    gameState.academy
+        .currentClubId =
+        null;
+
+    gameState.academy
+        .currentCategory =
+        null;
+
+    gameState.academy
+        .marketStatus =
+        "not_available";
+
+    gameState.academy
+        .freeAgentSinceYear =
+        null;
+
+    const relocation =
+        relocateProfessionalPlayer(
+            gameState,
+            club,
+            previousClubId
+        );
+
+    synchronizeFootballState(
+        gameState,
+        {
+            reason:
+                offer.moveType ===
+                    "free_agent"
+                    ? "professional_free_agent_signing"
+                    : "professional_transfer",
+
+            addTimeline:
+                false
+        }
+    );
+
+    return {
+        club,
+
+        previousClubId,
+
+        changedClub,
+
+        relocation
+    };
+}
+
+function closeOtherProfessionalOffers(
+    gameState,
+    acceptedOfferId
+) {
+    gameState.contracts
+        .offers
+        .forEach(
+            offer => {
+                if (
+                    offer.id !==
+                        acceptedOfferId &&
+                    offer.type ===
+                        "professional" &&
+                    offer.status ===
+                        "pending"
+                ) {
+                    offer.status =
+                        "superseded";
+                }
+            }
+        );
+}
+
+function hasFirstProfessionalMilestone(
+    gameState
+) {
+    ensureCareerState(
+        gameState
+    );
+
+    return gameState.career
+        .milestones
+        .some(
+            milestone =>
+                milestone.type ===
+                "first_professional_contract"
+        );
+}
 
 export function canSignFormationContract(
     gameState
@@ -79,7 +526,6 @@ export function canSignFormationContract(
     );
 }
 
-
 export function canSignFirstProfessionalContract(
     gameState
 ) {
@@ -96,7 +542,6 @@ export function canSignFirstProfessionalContract(
             .isProfessional
     );
 }
-
 
 function calculateFormationStipend(
     gameState,
@@ -149,7 +594,6 @@ function calculateFormationStipend(
     );
 }
 
-
 function calculateProfessionalSalary(
     gameState,
     club
@@ -201,7 +645,6 @@ function calculateProfessionalSalary(
     );
 }
 
-
 export function createFormationContractOffer(
     gameState
 ) {
@@ -223,6 +666,21 @@ export function createFormationContractOffer(
         "formation"
     ) {
         return null;
+    }
+
+    const pending =
+        gameState.contracts
+            .offers
+            .find(
+                offer =>
+                    offer.type ===
+                        "formation" &&
+                    offer.status ===
+                        "pending"
+            );
+
+    if (pending) {
+        return pending;
     }
 
     const club =
@@ -335,7 +793,6 @@ export function createFormationContractOffer(
     return offer;
 }
 
-
 export function createFirstProfessionalContractOffer(
     gameState
 ) {
@@ -417,7 +874,8 @@ export function createFirstProfessionalContractOffer(
 
     if (
         gameState.academy
-            .recognition >= 65
+            .recognition >=
+        65
     ) {
         promisedRole =
             "first_team_candidate";
@@ -425,7 +883,8 @@ export function createFirstProfessionalContractOffer(
 
     if (
         gameState.academy
-            .recognition >= 80
+            .recognition >=
+        80
     ) {
         promisedRole =
             "rotation_candidate";
@@ -520,9 +979,10 @@ export function createFirstProfessionalContractOffer(
     return offer;
 }
 
-
 function replaceCurrentContract(
-    gameState
+    gameState,
+    reason =
+        "new_contract"
 ) {
     const previous =
         getActiveContract(
@@ -540,11 +1000,10 @@ function replaceCurrentContract(
         gameState.calendar.year;
 
     previous.replacementReason =
-        "new_contract";
+        reason;
 
     return previous;
 }
-
 
 export function acceptFormationContractOffer(
     gameState,
@@ -648,9 +1107,10 @@ export function acceptFormationContractOffer(
     offer.status =
         "accepted";
 
-    gameState.contracts.byId[
-        contract.id
-    ] =
+    gameState.contracts
+        .byId[
+            contract.id
+        ] =
         contract;
 
     gameState.contracts
@@ -723,7 +1183,6 @@ export function acceptFormationContractOffer(
     return contract;
 }
 
-
 export function acceptFirstProfessionalContractOffer(
     gameState,
     offerId,
@@ -773,9 +1232,70 @@ export function acceptFirstProfessionalContractOffer(
         );
     }
 
+    const previousClubId =
+        gameState.player
+            .football
+            .currentClubId ??
+        null;
+
+    const previousClubName =
+        gameState.player
+            .football
+            .currentClubName ??
+        null;
+
+    const isMarketMove =
+        offer.source ===
+            "professional_market" ||
+        offer.moveType ===
+            "transfer" ||
+        offer.moveType ===
+            "free_agent";
+
+    const wasAlreadyProfessional =
+        Boolean(
+            gameState.player
+                .football
+                .isProfessional ||
+            hasFirstProfessionalMilestone(
+                gameState
+            )
+        );
+
+    const isFirstProfessionalContract =
+        offer
+            .firstProfessionalContract ===
+            true ||
+        !wasAlreadyProfessional;
+
+    const replacementReason =
+        isMarketMove
+            ? offer.moveType ===
+                "transfer"
+                ? "professional_transfer"
+                : "free_agent_signing"
+            : "new_professional_contract";
+
     replaceCurrentContract(
-        gameState
+        gameState,
+        replacementReason
     );
+
+    const maximumDuration =
+        isFirstProfessionalContract
+            ? 3
+            : 5;
+
+    const durationYears =
+        Math.max(
+            1,
+            Math.min(
+                maximumDuration,
+                Number(
+                    offer.durationYears
+                ) || 1
+            )
+        );
 
     const contract = {
         id:
@@ -787,7 +1307,28 @@ export function acceptFirstProfessionalContractOffer(
             "professional",
 
         firstProfessionalContract:
-            true,
+            isFirstProfessionalContract,
+
+        source:
+            offer.source ??
+            (
+                isFirstProfessionalContract
+                    ? "academy_first_contract"
+                    : "club_contract"
+            ),
+
+        moveType:
+            offer.moveType ??
+            (
+                previousClubId ===
+                    offer.clubId
+                    ? "renewal"
+                    : previousClubId
+                        ? "transfer"
+                        : "free_agent"
+            ),
+
+        previousClubId,
 
         clubId:
             offer.clubId,
@@ -801,35 +1342,37 @@ export function acceptFirstProfessionalContractOffer(
         startAge:
             gameState.calendar.age,
 
-        durationYears:
-            Math.min(
-                3,
-                offer.durationYears
-            ),
+        durationYears,
 
         endYear:
             gameState.calendar.year +
-            Math.min(
-                3,
-                offer.durationYears
-            ),
+            durationYears,
 
         salary:
-            offer.salary,
+            Number(
+                offer.salary
+            ) || 0,
 
         monthlyStipend: 0,
 
         signingBonus:
-            offer.signingBonus,
+            Number(
+                offer.signingBonus
+            ) || 0,
 
         appearanceBonus:
-            offer.appearanceBonus,
+            Number(
+                offer.appearanceBonus
+            ) || 0,
 
         goalBonus:
-            offer.goalBonus,
+            Number(
+                offer.goalBonus
+            ) || 0,
 
         promisedRole:
-            offer.promisedRole,
+            offer.promisedRole ??
+            "squad_player",
 
         guardianApproved:
             offer
@@ -838,7 +1381,10 @@ export function acceptFirstProfessionalContractOffer(
                 : null,
 
         negotiatedBy:
-            offer.negotiatedBy,
+            offer.negotiatedBy ??
+            getNegotiatedBy(
+                gameState
+            ),
 
         status:
             "active"
@@ -847,9 +1393,15 @@ export function acceptFirstProfessionalContractOffer(
     offer.status =
         "accepted";
 
-    gameState.contracts.byId[
-        contract.id
-    ] =
+    closeOtherProfessionalOffers(
+        gameState,
+        offer.id
+    );
+
+    gameState.contracts
+        .byId[
+            contract.id
+        ] =
         contract;
 
     gameState.contracts
@@ -867,13 +1419,51 @@ export function acceptFirstProfessionalContractOffer(
         .isProfessional =
         true;
 
-    gameState.professional
-        .status =
-        "contracted";
+    let moveResult =
+        null;
 
-    gameState.professional
-        .contractSignedYear =
-        gameState.calendar.year;
+    if (
+        isMarketMove
+    ) {
+        moveResult =
+            movePlayerToProfessionalClub(
+                gameState,
+                offer
+            );
+    }
+
+    gameState.professional =
+        gameState.professional ??
+        {};
+
+    if (
+        gameState.professional
+            .contractSignedYear ===
+            null ||
+        gameState.professional
+            .contractSignedYear ===
+            undefined
+    ) {
+        gameState.professional
+            .contractSignedYear =
+            gameState.calendar.year;
+    }
+
+    if (
+        isMarketMove
+    ) {
+        gameState.professional
+            .status =
+            gameState.player
+                .football
+                .hasDebutedProfessionally
+                ? "professional_player"
+                : "senior_squad";
+    } else {
+        gameState.professional
+            .status =
+            "contracted";
+    }
 
     gameState.finances
         .monthlyIncome =
@@ -882,11 +1472,33 @@ export function acceptFirstProfessionalContractOffer(
     gameState.finances.cash +=
         contract.signingBonus;
 
+    let historyAction =
+        "professional_contract_signed";
+
+    if (
+        isFirstProfessionalContract
+    ) {
+        historyAction =
+            "first_professional_contract_signed";
+    } else if (
+        contract.moveType ===
+        "transfer"
+    ) {
+        historyAction =
+            "professional_transfer_signed";
+    } else if (
+        contract.moveType ===
+        "free_agent"
+    ) {
+        historyAction =
+            "free_agent_contract_signed";
+    }
+
     gameState.contracts
         .history
         .push({
             action:
-                "first_professional_contract_signed",
+                historyAction,
 
             contractId:
                 contract.id,
@@ -900,43 +1512,117 @@ export function acceptFirstProfessionalContractOffer(
             age:
                 gameState.calendar.age,
 
-            clubId:
-                contract.clubId
-        });
-
-    gameState.career
-        .milestones
-        .push({
-            type:
-                "first_professional_contract",
-
-            year:
-                gameState.calendar.year,
-
-            age:
-                gameState.calendar.age,
+            previousClubId,
 
             clubId:
-                contract.clubId
+                contract.clubId,
+
+            moveType:
+                contract.moveType,
+
+            previousCityId:
+                moveResult
+                    ?.relocation
+                    ?.previousCityId ??
+                null,
+
+            newCityId:
+                moveResult
+                    ?.relocation
+                    ?.newCityId ??
+                null
         });
+
+    if (
+        isFirstProfessionalContract &&
+        !hasFirstProfessionalMilestone(
+            gameState
+        )
+    ) {
+        gameState.career
+            .milestones
+            .push({
+                type:
+                    "first_professional_contract",
+
+                year:
+                    gameState.calendar.year,
+
+                age:
+                    gameState.calendar.age,
+
+                clubId:
+                    contract.clubId
+            });
+    }
+
+    let timelineType =
+        "professional_contract_signed";
+
+    let timelineTitle =
+        "Novo contrato profissional";
+
+    let timelineDescription =
+        `${gameState.player.identity.fullName} assinou contrato profissional com o ${contract.clubName}.`;
+
+    if (
+        isFirstProfessionalContract
+    ) {
+        timelineType =
+            "first_professional_contract_signed";
+
+        timelineTitle =
+            "Primeiro contrato profissional";
+
+        timelineDescription =
+            `${gameState.player.identity.fullName} assinou seu primeiro contrato profissional com o ${contract.clubName}.`;
+    } else if (
+        contract.moveType ===
+        "transfer"
+    ) {
+        timelineType =
+            "professional_transfer";
+
+        timelineTitle =
+            `Transferência para o ${contract.clubName}`;
+
+        timelineDescription =
+            `${gameState.player.identity.fullName} deixou o ${previousClubName ?? "clube anterior"} e assinou com o ${contract.clubName}.`;
+    } else if (
+        contract.moveType ===
+        "free_agent"
+    ) {
+        timelineType =
+            "free_agent_signing";
+
+        timelineTitle =
+            `Novo clube: ${contract.clubName}`;
+
+        timelineDescription =
+            `${gameState.player.identity.fullName} encerrou seu período como agente livre e assinou com o ${contract.clubName}.`;
+    }
 
     addTimelineEntry(
         gameState,
         {
             type:
-                "first_professional_contract_signed",
+                timelineType,
 
             title:
-                "Primeiro contrato profissional",
+                timelineTitle,
 
             description:
-                `${gameState.player.identity.fullName} assinou seu primeiro contrato profissional com o ${contract.clubName}.`,
+                timelineDescription,
 
-            importance: 10,
+            importance:
+                isFirstProfessionalContract
+                    ? 10
+                    : 9,
 
             relatedEntities: [
+                previousClubId,
                 contract.clubId
-            ],
+            ].filter(Boolean),
 
             metadata: {
                 contractId:
@@ -955,14 +1641,28 @@ export function acceptFirstProfessionalContractOffer(
                     contract.endYear,
 
                 promisedRole:
-                    contract.promisedRole
+                    contract.promisedRole,
+
+                moveType:
+                    contract.moveType,
+
+                previousCityId:
+                    moveResult
+                        ?.relocation
+                        ?.previousCityId ??
+                    null,
+
+                newCityId:
+                    moveResult
+                        ?.relocation
+                        ?.newCityId ??
+                    null
             }
         }
     );
 
     return contract;
 }
-
 
 export function declineFormationContractOffer(
     gameState,
@@ -974,7 +1674,6 @@ export function declineFormationContractOffer(
     );
 }
 
-
 export function declineProfessionalContractOffer(
     gameState,
     offerId
@@ -984,7 +1683,6 @@ export function declineProfessionalContractOffer(
         offerId
     );
 }
-
 
 export function declineContractOffer(
     gameState,
@@ -1010,7 +1708,6 @@ export function declineContractOffer(
 
     return offer;
 }
-
 
 export function getActiveContract(
     gameState
@@ -1040,7 +1737,6 @@ export function getActiveContract(
     return contract;
 }
 
-
 export function getContractYearsRemaining(
     gameState,
     contract =
@@ -1058,7 +1754,6 @@ export function getContractYearsRemaining(
         gameState.calendar.year
     );
 }
-
 
 export function updateContractStatus(
     gameState
@@ -1079,15 +1774,15 @@ export function updateContractStatus(
         );
 
     if (
-        yearsRemaining <= 1
+        yearsRemaining <=
+        1
     ) {
         const alertExists =
             gameState.contracts
                 .alerts
                 .some(
                     alert =>
-                        alert
-                            .contractId ===
+                        alert.contractId ===
                             contract.id &&
                         alert.year ===
                             gameState
@@ -1095,7 +1790,9 @@ export function updateContractStatus(
                                 .year
                 );
 
-        if (!alertExists) {
+        if (
+            !alertExists
+        ) {
             gameState.contracts
                 .alerts
                 .push({
@@ -1111,11 +1808,13 @@ export function updateContractStatus(
                         gameState.calendar.year,
 
                     type:
-                        yearsRemaining === 0
+                        yearsRemaining ===
+                            0
                             ? "expires_this_year"
                             : "one_year_remaining",
 
-                    read: false
+                    read:
+                        false
                 });
         }
     }

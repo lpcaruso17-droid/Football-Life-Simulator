@@ -12,6 +12,14 @@ import {
 } from "../systems/inboxSystem.js";
 
 import {
+    getPerson
+} from "../systems/personSystem.js";
+
+import {
+    getAgencyById
+} from "../data/agencies.js";
+
+import {
     showFeedback
 } from "./feedback.js";
 
@@ -74,6 +82,30 @@ function escapeHtml(
 }
 
 
+function formatMoney(
+    value
+) {
+    return new Intl
+        .NumberFormat(
+            "pt-BR",
+            {
+                style:
+                    "currency",
+
+                currency:
+                    "BRL",
+
+                maximumFractionDigits:
+                    0
+            }
+        )
+        .format(
+            Number(value) ||
+            0
+        );
+}
+
+
 function getTypeLabel(
     message
 ) {
@@ -126,12 +158,17 @@ function getResolutionLabel(
         withdrawn:
             "Retirada pelo clube",
 
+        superseded:
+            "Encerrada após outra assinatura",
+
         read:
             "Lida"
     };
 
     return (
-        labels[resolution] ??
+        labels[
+            resolution
+        ] ??
         resolution ??
         "Resolvida"
     );
@@ -156,9 +193,288 @@ function getFamilyStatusLabel(
     };
 
     return (
-        labels[status] ??
+        labels[
+            status
+        ] ??
         null
     );
+}
+
+
+function getMessageOffer(
+    game,
+    message
+) {
+    if (
+        !message ||
+        (
+            message.offerType !==
+                "formation_contract" &&
+            message.offerType !==
+                "professional_contract"
+        )
+    ) {
+        return null;
+    }
+
+    return (
+        game.contracts
+            ?.offers
+            ?.find(
+                offer =>
+                    offer.id ===
+                    message.offerId
+            ) ??
+        null
+    );
+}
+
+
+function getRepresentationContext(
+    game,
+    message = null
+) {
+    const offer =
+        message
+            ? getMessageOffer(
+                game,
+                message
+            )
+            : null;
+
+    const agreement =
+        game.representation
+            ?.activeAgreement ??
+        null;
+
+    const messageMetadata =
+        message
+            ?.metadata ??
+        {};
+
+    const representative =
+        offer
+            ?.representative ??
+        {};
+
+    const agentPersonId =
+        messageMetadata
+            .agentPersonId ??
+        representative
+            .agentPersonId ??
+        game.representation
+            ?.currentAgentPersonId ??
+        agreement
+            ?.agentPersonId ??
+        null;
+
+    const agencyId =
+        messageMetadata
+            .agencyId ??
+        representative
+            .agencyId ??
+        game.representation
+            ?.currentAgencyId ??
+        agreement
+            ?.agencyId ??
+        null;
+
+    const agent =
+        agentPersonId
+            ? getPerson(
+                game,
+                agentPersonId
+            )
+            : null;
+
+    const agency =
+        agencyId
+            ? getAgencyById(
+                agencyId
+            )
+            : null;
+
+    const agentName =
+        messageMetadata
+            .agentName ??
+        representative
+            .agentName ??
+        agent
+            ?.identity
+            ?.fullName ??
+        null;
+
+    const agencyName =
+        messageMetadata
+            .agencyName ??
+        representative
+            .agencyName ??
+        agency
+            ?.name ??
+        agreement
+            ?.agencyName ??
+        null;
+
+    if (
+        !agentName &&
+        !agencyName
+    ) {
+        return null;
+    }
+
+    return {
+        agentPersonId,
+
+        agencyId,
+
+        agentName:
+            agentName ??
+            "Seu empresário",
+
+        agencyName
+    };
+}
+
+
+function getRepresentationSentence(
+    context
+) {
+    if (!context) {
+        return null;
+    }
+
+    if (
+        context.agentName &&
+        context.agencyName
+    ) {
+        return `${context.agentName}, da ${context.agencyName}`;
+    }
+
+    if (
+        context.agencyName
+    ) {
+        return `a ${context.agencyName}`;
+    }
+
+    return (
+        context.agentName ??
+        "seu empresário"
+    );
+}
+
+
+function captureOfferTerms(
+    offer
+) {
+    if (!offer) {
+        return null;
+    }
+
+    return {
+        salary:
+            Number(
+                offer.salary
+            ) || 0,
+
+        signingBonus:
+            Number(
+                offer.signingBonus
+            ) || 0,
+
+        monthlyStipend:
+            Number(
+                offer.monthlyStipend
+            ) || 0
+    };
+}
+
+
+function buildNegotiationDetails(
+    beforeTerms,
+    offer
+) {
+    if (
+        !offer ||
+        !beforeTerms
+    ) {
+        return null;
+    }
+
+    if (
+        offer.type ===
+        "formation"
+    ) {
+        return `Bolsa mensal: ${formatMoney(
+            beforeTerms
+                .monthlyStipend
+        )} → ${formatMoney(
+            offer.monthlyStipend
+        )}`;
+    }
+
+    return `Salário: ${formatMoney(
+        beforeTerms.salary
+    )} → ${formatMoney(
+        offer.salary
+    )} · Luvas: ${formatMoney(
+        beforeTerms.signingBonus
+    )} → ${formatMoney(
+        offer.signingBonus
+    )}`;
+}
+
+
+function renderRepresentationNote(
+    game,
+    message
+) {
+    const isContract =
+        message.offerType ===
+            "formation_contract" ||
+        message.offerType ===
+            "professional_contract";
+
+    if (!isContract) {
+        return "";
+    }
+
+    const context =
+        getRepresentationContext(
+            game,
+            message
+        );
+
+    if (!context) {
+        return "";
+    }
+
+    const sentence =
+        getRepresentationSentence(
+            context
+        );
+
+    return `
+        <div
+            style="
+                margin-top: 14px;
+                padding: 12px 14px;
+                border: 1px solid rgba(255,255,255,0.10);
+                border-radius: 12px;
+                background: rgba(255,255,255,0.035);
+                font-size: 0.92rem;
+                line-height: 1.5;
+            "
+        >
+            <strong>
+                Representação:
+            </strong>
+
+            ${escapeHtml(
+                sentence
+            )}
+            acompanha esta negociação em seu nome.
+        </div>
+    `;
 }
 
 
@@ -205,10 +521,10 @@ function renderMessage(
                     message
                         .familyConversationCount ??
                     0
-                ) < 2
+                ) <
+                2
             )
         );
-
 
     return `
         <article
@@ -264,8 +580,8 @@ function renderMessage(
 
                 </div>
 
-
                 <div class="inbox-date">
+
                     ${escapeHtml(
                         message.createdYear
                     )}
@@ -276,6 +592,7 @@ function renderMessage(
                         message.createdAge
                     )}
                     anos
+
                 </div>
 
             </div>
@@ -286,6 +603,12 @@ function renderMessage(
                     message.body
                 )}
             </p>
+
+
+            ${renderRepresentationNote(
+                game,
+                message
+            )}
 
 
             ${
@@ -414,7 +737,6 @@ async function showFamilyDecision(
         return;
     }
 
-
     if (
         decision.status ===
         "concerned"
@@ -438,7 +760,6 @@ async function showFamilyDecision(
 
         return;
     }
-
 
     if (
         decision.status ===
@@ -466,7 +787,6 @@ async function showFamilyDecision(
 
         return;
     }
-
 
     await showFeedback({
         type:
@@ -496,7 +816,13 @@ async function showFamilyDecision(
 
 async function showActionResult(
     action,
-    result
+    result,
+    {
+        representationContext =
+            null,
+        beforeTerms =
+            null
+    } = {}
 ) {
     if (
         action ===
@@ -514,6 +840,16 @@ async function showActionResult(
         action ===
         "negotiate"
     ) {
+        const representative =
+            getRepresentationSentence(
+                representationContext
+            );
+
+        const negotiationLead =
+            representative
+                ? `${representative} conduziu a contraproposta em seu nome.`
+                : "Você apresentou uma contraproposta ao clube.";
+
         if (
             result.status ===
             "improved"
@@ -529,7 +865,13 @@ async function showActionResult(
                     "O clube melhorou a proposta",
 
                 message:
-                    "A negociação funcionou e as condições financeiras foram atualizadas.",
+                    `${negotiationLead} O clube aceitou melhorar as condições financeiras.`,
+
+                details:
+                    buildNegotiationDetails(
+                        beforeTerms,
+                        result.offer
+                    ),
 
                 primaryLabel:
                     "VER PROPOSTA"
@@ -554,7 +896,7 @@ async function showActionResult(
                     "O clube manteve os valores",
 
                 message:
-                    "A diretoria ouviu sua contraproposta, mas decidiu manter as condições originais.",
+                    `${negotiationLead} A diretoria ouviu o pedido, mas decidiu manter as condições originais.`,
 
                 primaryLabel:
                     "ENTENDI"
@@ -579,7 +921,7 @@ async function showActionResult(
                     "A proposta foi retirada",
 
                 message:
-                    "O clube não aceitou avançar nos novos termos e encerrou a negociação.",
+                    `${negotiationLead} O clube não aceitou avançar nos novos termos e encerrou a negociação.`,
 
                 primaryLabel:
                     "CONTINUAR"
@@ -594,6 +936,16 @@ async function showActionResult(
         action ===
         "accept"
     ) {
+        const representative =
+            getRepresentationSentence(
+                representationContext
+            );
+
+        const message =
+            representative
+                ? `${representative} acompanhou a conclusão do acordo. A decisão agora faz parte da sua trajetória.`
+                : "A decisão agora faz parte da sua trajetória.";
+
         await showFeedback({
             type:
                 "success",
@@ -604,8 +956,7 @@ async function showActionResult(
             title:
                 "Proposta aceita",
 
-            message:
-                "A decisão agora faz parte da sua trajetória.",
+            message,
 
             primaryLabel:
                 "CONTINUAR"
@@ -778,7 +1129,6 @@ export function renderInboxView(
             game
         );
 
-
     const messages =
         getInboxMessages(
             game,
@@ -841,6 +1191,7 @@ export function renderInboxView(
                                 "
                                 data-inbox-channel="${channel}"
                             >
+
                                 ${CHANNEL_LABELS[channel]}
 
                                 ${
@@ -854,6 +1205,7 @@ export function renderInboxView(
                                         `
                                         : ""
                                 }
+
                             </button>
                         `
                     )
@@ -877,9 +1229,7 @@ export function renderInboxView(
                             .join("")
                         : `
                             <div class="card empty-state">
-
                                 Nenhuma mensagem nesta categoria.
-
                             </div>
                         `
                 }
@@ -946,6 +1296,14 @@ export function renderInboxView(
                     card.dataset
                         .messageId;
 
+                const message =
+                    game.inbox
+                        ?.find(
+                            item =>
+                                item.id ===
+                                messageId
+                        ) ??
+                    null;
 
                 markInboxMessageRead(
                     game,
@@ -972,6 +1330,22 @@ export function renderInboxView(
                                             button.disabled =
                                                 true;
 
+                                            const offerBefore =
+                                                getMessageOffer(
+                                                    game,
+                                                    message
+                                                );
+
+                                            const beforeTerms =
+                                                captureOfferTerms(
+                                                    offerBefore
+                                                );
+
+                                            const representationContext =
+                                                getRepresentationContext(
+                                                    game,
+                                                    message
+                                                );
 
                                             const result =
                                                 resolveInboxAction(
@@ -979,7 +1353,6 @@ export function renderInboxView(
                                                     messageId,
                                                     action
                                                 );
-
 
                                             saveGame(
                                                 game,
@@ -989,12 +1362,14 @@ export function renderInboxView(
                                                 }
                                             );
 
-
                                             await showActionResult(
                                                 action,
-                                                result
+                                                result,
+                                                {
+                                                    representationContext,
+                                                    beforeTerms
+                                                }
                                             );
-
 
                                             renderInboxView(
                                                 root
@@ -1006,11 +1381,9 @@ export function renderInboxView(
                                                 error
                                             );
 
-
                                             await showActionError(
                                                 error
                                             );
-
 
                                             button.disabled =
                                                 false;
