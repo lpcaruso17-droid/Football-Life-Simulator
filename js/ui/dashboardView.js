@@ -43,6 +43,10 @@ import {
 } from "../systems/inboxSystem.js";
 
 import {
+    getCurrentFootballSnapshot
+} from "../systems/footballStatusSystem.js";
+
+import {
     navigateTo
 } from "./router.js";
 
@@ -103,6 +107,13 @@ function money(
 function categoryLabel(
     categoryId
 ) {
+    if (
+        categoryId ===
+        "professional"
+    ) {
+        return "Profissional";
+    }
+
     return (
         getAcademyCategoryById(
             categoryId
@@ -170,7 +181,10 @@ function squadStatusLabel(
             "Destaque",
 
         unattached:
-            "Sem clube"
+            "Sem clube",
+
+        free_agent:
+            "Agente livre"
     };
 
     return (
@@ -441,6 +455,11 @@ export function renderDashboardView(
     const player =
         game.player;
 
+    const football =
+        getCurrentFootballSnapshot(
+            game
+        );
+
     const city =
         getCityById(
             player.identity
@@ -449,8 +468,7 @@ export function renderDashboardView(
 
     const category =
         categoryLabel(
-            player.football
-                .currentCategory
+            football.categoryId
         );
 
     const season =
@@ -533,14 +551,13 @@ export function renderDashboardView(
                         ·
 
                         ${escapeHtml(
-                            player.football
-                                .currentClubName ??
-                            "Sem clube"
+                            football.clubName ??
+                            "Agente livre"
                         )}
 
                         ${
-                            player.football
-                                .currentCategory
+                            football.hasClub &&
+                            football.categoryId
                                 ? ` · ${escapeHtml(
                                     category
                                 )}`
@@ -703,8 +720,7 @@ export function renderDashboardView(
 
                             <div class="info-item-value">
                                 ${escapeHtml(
-                                    player.football
-                                        .currentClubName ??
+                                    football.clubName ??
                                     "Sem clube"
                                 )}
                             </div>
@@ -717,7 +733,9 @@ export function renderDashboardView(
 
                             <div class="info-item-value">
                                 ${escapeHtml(
-                                    category
+                                    football.hasClub
+                                        ? category
+                                        : "—"
                                 )}
                             </div>
                         </div>
@@ -739,14 +757,17 @@ export function renderDashboardView(
 
                         <div>
                             <div class="info-item-label">
-                                Status no elenco
+                                ${
+                                    football.hasClub
+                                        ? "Status no elenco"
+                                        : "Situação"
+                                }
                             </div>
 
                             <div class="info-item-value">
                                 ${escapeHtml(
                                     squadStatusLabel(
-                                        player.football
-                                            .squadStatus
+                                        football.squadStatus
                                     )
                                 )}
                             </div>
@@ -785,65 +806,84 @@ export function renderDashboardView(
                         Momento no futebol
                     </div>
 
-                    <div class="info-grid">
-                        <div>
-                            <div class="info-item-label">
-                                Confiança do treinador
-                            </div>
+                    ${
+                        football.hasClub
+                            ? `
+                                <div class="info-grid">
+                                    <div>
+                                        <div class="info-item-label">
+                                            Confiança do treinador
+                                        </div>
 
-                            <div class="info-item-value">
-                                ${escapeHtml(
-                                    game.footballContext
-                                        ?.coachTrust ??
-                                    45
-                                )}
-                            </div>
-                        </div>
+                                        <div class="info-item-value">
+                                            ${escapeHtml(
+                                                game.footballContext
+                                                    ?.coachTrust ??
+                                                45
+                                            )}
+                                        </div>
+                                    </div>
 
-                        <div>
-                            <div class="info-item-label">
-                                Forma
-                            </div>
+                                    <div>
+                                        <div class="info-item-label">
+                                            Forma
+                                        </div>
 
-                            <div class="info-item-value">
-                                ${escapeHtml(
-                                    game.footballContext
-                                        ?.form ??
-                                    50
-                                )}
-                            </div>
-                        </div>
+                                        <div class="info-item-value">
+                                            ${escapeHtml(
+                                                game.footballContext
+                                                    ?.form ??
+                                                50
+                                            )}
+                                        </div>
+                                    </div>
 
-                        <div>
-                            <div class="info-item-label">
-                                Concorrência
-                            </div>
+                                    <div>
+                                        <div class="info-item-label">
+                                            Concorrência
+                                        </div>
 
-                            <div class="info-item-value">
-                                ${escapeHtml(
-                                    game.footballContext
-                                        ?.positionCompetition ??
-                                    0
-                                )}
-                                concorrente(s)
-                            </div>
-                        </div>
+                                        <div class="info-item-value">
+                                            ${escapeHtml(
+                                                game.footballContext
+                                                    ?.positionCompetition ??
+                                                0
+                                            )}
+                                            concorrente(s)
+                                        </div>
+                                    </div>
 
-                        <div>
-                            <div class="info-item-label">
-                                Profissional
-                            </div>
+                                    <div>
+                                        <div class="info-item-label">
+                                            Profissional
+                                        </div>
 
-                            <div class="info-item-value">
-                                ${
-                                    player.football
-                                        .isProfessional
-                                        ? "Sim"
-                                        : "Não"
-                                }
-                            </div>
-                        </div>
-                    </div>
+                                        <div class="info-item-value">
+                                            ${
+                                                player.football
+                                                    .isProfessional
+                                                    ? "Sim"
+                                                    : "Não"
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+                            `
+                            : `
+                                <div class="muted">
+                                    Você está sem clube${
+                                        football.freeAgentSinceYear
+                                            ? ` desde ${escapeHtml(
+                                                football.freeAgentSinceYear
+                                            )}`
+                                            : ""
+                                    }. Enquanto estiver como agente livre,
+                                    não existe confiança de treinador,
+                                    concorrência interna ou status de elenco
+                                    para exibir.
+                                </div>
+                            `
+                    }
                 </section>
 
                 <section class="dashboard-panel">

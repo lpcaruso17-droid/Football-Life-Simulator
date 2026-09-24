@@ -2,6 +2,10 @@ import {
     updateGameTimestamp
 } from "./gameState.js";
 
+import {
+    migrateGameState
+} from "./migration.js";
+
 
 const REGISTRY_KEY =
     "footballLife:v05:registry";
@@ -202,10 +206,36 @@ export function loadGame(
         return null;
     }
 
-    return readJson(
-        saveKey(saveId),
-        null
-    );
+    const loaded =
+        readJson(
+            saveKey(saveId),
+            null
+        );
+
+    if (!loaded) {
+        return null;
+    }
+
+    const migration =
+        migrateGameState(
+            loaded
+        );
+
+    if (
+        migration.changed &&
+        migration.gameState
+    ) {
+        writeJson(
+            saveKey(saveId),
+            migration.gameState
+        );
+
+        updateRegistry(
+            migration.gameState
+        );
+    }
+
+    return migration.gameState;
 }
 
 

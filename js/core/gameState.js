@@ -7,7 +7,7 @@ import {
 export const GAME_VERSION =
     "0.5.0-alpha";
 
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 
 function createId(prefix) {
@@ -415,6 +415,9 @@ export function createGameState({
             categoryHistory: [],
 
             freeAgentSpells: [],
+
+            currentFreeAgentSinceYear:
+                null,
 
             positionHistory: [],
 

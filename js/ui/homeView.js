@@ -42,12 +42,20 @@ function escapeHtml(
 function renderSaveCard(
     save
 ) {
-    const category =
-        save.category
-            ? ` · ${escapeHtml(
-                String(
+    const categoryLabel =
+        save.category ===
+        "professional"
+            ? "Profissional"
+            : save.category
+                ? String(
                     save.category
                 ).toUpperCase()
+                : null;
+
+    const category =
+        categoryLabel
+            ? ` · ${escapeHtml(
+                categoryLabel
             )}`
             : "";
 

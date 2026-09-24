@@ -80,6 +80,10 @@ import {
     addTimelineEntry
 } from "./timelineSystem.js";
 
+import {
+    synchronizeFootballState
+} from "./footballStatusSystem.js";
+
 
 const runtimeFlows =
     new Map();
@@ -267,6 +271,14 @@ function createRuntimeFlow(
 function getOrCreateRuntimeFlow(
     gameState
 ) {
+    synchronizeFootballState(
+        gameState,
+        {
+            reason:
+                "year_flow_start"
+        }
+    );
+
     const key =
         createRuntimeKey(
             gameState
@@ -532,6 +544,14 @@ function finalizeYear(
     gameState,
     flow
 ) {
+    synchronizeFootballState(
+        gameState,
+        {
+            reason:
+                "year_end_before_season"
+        }
+    );
+
     let season = null;
 
     let academyDecision =
@@ -555,6 +575,12 @@ function finalizeYear(
             gameState.academy
                 .currentClubId
         ) &&
+        gameState.calendar.age <=
+            20 &&
+        gameState.player
+            .football
+            .currentCategory !==
+            "professional" &&
         !gameState.player
             .football
             .hasDebutedProfessionally;
@@ -570,6 +596,15 @@ function finalizeYear(
 
     updateContractStatus(
         gameState
+    );
+
+
+    synchronizeFootballState(
+        gameState,
+        {
+            reason:
+                "year_end_contract_status"
+        }
     );
 
 
@@ -635,6 +670,15 @@ function finalizeYear(
     );
 
 
+    synchronizeFootballState(
+        gameState,
+        {
+            reason:
+                "new_year_age_sync"
+        }
+    );
+
+
     flow.completed =
         true;
 
@@ -654,6 +698,14 @@ function completeCurrentNarrativeItem(
     gameState,
     flow
 ) {
+    synchronizeFootballState(
+        gameState,
+        {
+            reason:
+                "narrative_resolution"
+        }
+    );
+
     const phase =
         gameState.calendar
             .phase;

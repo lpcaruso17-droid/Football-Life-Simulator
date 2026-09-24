@@ -28,6 +28,10 @@ import {
     addTimelineEntry
 } from "./timelineSystem.js";
 
+import {
+    isSeniorFootball
+} from "./footballStatusSystem.js";
+
 
 function createId(prefix) {
     if (
@@ -104,12 +108,9 @@ function getCompetitionName(
     gameState
 ) {
     if (
-        gameState.player
-            .football
-            .hasDebutedProfessionally &&
-        gameState.professional
-            .status ===
-            "professional_player"
+        isSeniorFootball(
+            gameState
+        )
     ) {
         return "Liga Nacional";
     }
@@ -148,12 +149,9 @@ function getTeamMatchRange(
     gameState
 ) {
     if (
-        gameState.player
-            .football
-            .hasDebutedProfessionally &&
-        gameState.professional
-            .status ===
-            "professional_player"
+        isSeniorFootball(
+            gameState
+        )
     ) {
         return [
             30,
