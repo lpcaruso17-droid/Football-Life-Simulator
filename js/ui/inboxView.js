@@ -20,6 +20,14 @@ import {
 } from "../data/agencies.js";
 
 import {
+    isConversationMessage,
+    prepareConversationMessage,
+    getConversationReplyOptions,
+    getConversationThreadEntries,
+    resolveConversationReply
+} from "../systems/conversationSystem.js";
+
+import {
     showFeedback
 } from "./feedback.js";
 
@@ -123,13 +131,13 @@ function getTypeLabel(
             "CONTRATO PROFISSIONAL",
 
         family_message:
-            "MENSAGEM DA FAMÍLIA",
+            "CONVERSA COM A FAMÍLIA",
 
         family_decision:
             "RESPOSTA DA FAMÍLIA",
 
         social_message:
-            "MENSAGEM PESSOAL"
+            "CONVERSA PESSOAL"
     };
 
     return (
@@ -162,7 +170,10 @@ function getResolutionLabel(
             "Encerrada após outra assinatura",
 
         read:
-            "Lida"
+            "Lida",
+
+        conversation_replied:
+            "Respondida"
     };
 
     return (
@@ -478,10 +489,161 @@ function renderRepresentationNote(
 }
 
 
+function renderConversationThread(
+    game,
+    message
+) {
+    const entries =
+        getConversationThreadEntries(
+            game,
+            message
+        );
+
+    if (!entries.length) {
+        return `
+            <p class="inbox-body">
+                ${escapeHtml(
+                    message.body
+                )}
+            </p>
+        `;
+    }
+
+    return `
+        <div
+            style="
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                margin-top: 16px;
+            "
+        >
+            ${entries
+                .map(
+                    entry => {
+                        const player =
+                            entry.speaker ===
+                            "player";
+
+                        return `
+                            <div
+                                style="
+                                    align-self: ${player ? "flex-end" : "flex-start"};
+                                    width: min(88%, 620px);
+                                    padding: 12px 14px;
+                                    border-radius: 14px;
+                                    border: 1px solid rgba(255,255,255,0.09);
+                                    background: ${player ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.035)"};
+                                "
+                            >
+                                <div
+                                    style="
+                                        font-size: 0.76rem;
+                                        text-transform: uppercase;
+                                        letter-spacing: 0.08em;
+                                        opacity: 0.65;
+                                        margin-bottom: 6px;
+                                    "
+                                >
+                                    ${escapeHtml(
+                                        player
+                                            ? "Você"
+                                            : entry.speakerName
+                                    )}
+                                </div>
+
+                                <div
+                                    style="
+                                        line-height: 1.55;
+                                    "
+                                >
+                                    ${escapeHtml(
+                                        entry.text
+                                    )}
+                                </div>
+                            </div>
+                        `;
+                    }
+                )
+                .join("")}
+        </div>
+    `;
+}
+
+
+function renderConversationReplies(
+    game,
+    message
+) {
+    const options =
+        getConversationReplyOptions(
+            game,
+            message
+        );
+
+    if (!options.length) {
+        return "";
+    }
+
+    return `
+        <div
+            style="
+                margin-top: 18px;
+                padding-top: 16px;
+                border-top: 1px solid rgba(255,255,255,0.08);
+            "
+        >
+            <div
+                style="
+                    margin-bottom: 10px;
+                    font-size: 0.8rem;
+                    opacity: 0.65;
+                    text-transform: uppercase;
+                    letter-spacing: 0.08em;
+                "
+            >
+                Como você quer responder?
+            </div>
+
+            <div
+                style="
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 10px;
+                "
+            >
+                ${options
+                    .map(
+                        option => `
+                            <button
+                                type="button"
+                                class="btn"
+                                data-conversation-reply="${escapeHtml(
+                                    option.id
+                                )}"
+                            >
+                                ${escapeHtml(
+                                    option.label
+                                )}
+                            </button>
+                        `
+                    )
+                    .join("")}
+            </div>
+        </div>
+    `;
+}
+
+
 function renderMessage(
     game,
     message
 ) {
+    const conversation =
+        isConversationMessage(
+            message
+        );
+
     const resolved =
         message.status ===
         "resolved";
@@ -598,17 +760,30 @@ function renderMessage(
             </div>
 
 
-            <p class="inbox-body">
-                ${escapeHtml(
-                    message.body
-                )}
-            </p>
+            ${
+                conversation
+                    ? renderConversationThread(
+                        game,
+                        message
+                    )
+                    : `
+                        <p class="inbox-body">
+                            ${escapeHtml(
+                                message.body
+                            )}
+                        </p>
+                    `
+            }
 
 
-            ${renderRepresentationNote(
-                game,
-                message
-            )}
+            ${
+                conversation
+                    ? ""
+                    : renderRepresentationNote(
+                        game,
+                        message
+                    )
+            }
 
 
             ${
@@ -632,76 +807,92 @@ function renderMessage(
 
 
             ${
-                resolved
-                    ? `
-                        <div class="inbox-resolution">
-                            ${escapeHtml(
-                                getResolutionLabel(
-                                    message.resolution
-                                )
-                            )}
-                        </div>
-                    `
-                    : (
-                        message.actionable
+                conversation
+                    ? (
+                        message.resolution ===
+                        "conversation_replied"
                             ? `
-                                <div class="inbox-actions">
-
-                                    ${
-                                        familyCanTalkAgain
-                                            ? `
-                                                <button
-                                                    type="button"
-                                                    class="btn"
-                                                    data-action="family"
-                                                >
-                                                    ${
-                                                        familyStatus
-                                                            ? "Conversar novamente"
-                                                            : "Conversar com a família"
-                                                    }
-                                                </button>
-                                            `
-                                            : ""
-                                    }
-
-                                    ${
-                                        canNegotiate
-                                            ? `
-                                                <button
-                                                    type="button"
-                                                    class="btn"
-                                                    data-action="negotiate"
-                                                >
-                                                    Negociar
-                                                </button>
-                                            `
-                                            : ""
-                                    }
-
-                                    <button
-                                        type="button"
-                                        class="btn btn-primary"
-                                        data-action="accept"
-                                    >
-                                        Aceitar
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        class="btn btn-danger"
-                                        data-action="decline"
-                                    >
-                                        Recusar
-                                    </button>
-
+                                <div class="inbox-resolution">
+                                    Respondida
                                 </div>
                             `
-                            : `
-                                <div class="inbox-message-read">
-                                    Mensagem pessoal
+                            : renderConversationReplies(
+                                game,
+                                message
+                            )
+                    )
+                    : (
+                        resolved
+                            ? `
+                                <div class="inbox-resolution">
+                                    ${escapeHtml(
+                                        getResolutionLabel(
+                                            message.resolution
+                                        )
+                                    )}
                                 </div>
                             `
+                            : (
+                                message.actionable
+                                    ? `
+                                        <div class="inbox-actions">
+
+                                            ${
+                                                familyCanTalkAgain
+                                                    ? `
+                                                        <button
+                                                            type="button"
+                                                            class="btn"
+                                                            data-action="family"
+                                                        >
+                                                            ${
+                                                                familyStatus
+                                                                    ? "Conversar novamente"
+                                                                    : "Conversar com a família"
+                                                            }
+                                                        </button>
+                                                    `
+                                                    : ""
+                                            }
+
+                                            ${
+                                                canNegotiate
+                                                    ? `
+                                                        <button
+                                                            type="button"
+                                                            class="btn"
+                                                            data-action="negotiate"
+                                                        >
+                                                            Negociar
+                                                        </button>
+                                                    `
+                                                    : ""
+                                            }
+
+                                            <button
+                                                type="button"
+                                                class="btn btn-primary"
+                                                data-action="accept"
+                                            >
+                                                Aceitar
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                class="btn btn-danger"
+                                                data-action="decline"
+                                            >
+                                                Recusar
+                                            </button>
+
+                                        </div>
+                                    `
+                                    : `
+                                        <div class="inbox-message-read">
+                                            Mensagem pessoal
+                                        </div>
+                                    `
+                            )
                     )
             }
 
@@ -990,6 +1181,32 @@ async function showActionResult(
 }
 
 
+async function showConversationResult(
+    result
+) {
+    await showFeedback({
+        type:
+            "success",
+
+        eyebrow:
+            "CONVERSA",
+
+        title:
+            "Resposta enviada",
+
+        message:
+            result.senderReply,
+
+        details:
+            result.effectsSummary ||
+            "A conversa foi registrada na relação entre vocês.",
+
+        primaryLabel:
+            "CONTINUAR"
+    });
+}
+
+
 async function showActionError(
     error
 ) {
@@ -1124,15 +1341,37 @@ export function renderInboxView(
     }
 
 
-    const counts =
-        getInboxChannelCounts(
-            game
-        );
-
     const messages =
         getInboxMessages(
             game,
             activeInboxChannel
+        );
+
+
+    messages.forEach(
+        message => {
+            if (
+                isConversationMessage(
+                    message
+                )
+            ) {
+                prepareConversationMessage(
+                    game,
+                    message
+                );
+
+                markInboxMessageRead(
+                    game,
+                    message.id
+                );
+            }
+        }
+    );
+
+
+    const counts =
+        getInboxChannelCounts(
+            game
         );
 
 
@@ -1305,10 +1544,74 @@ export function renderInboxView(
                         ) ??
                     null;
 
-                markInboxMessageRead(
-                    game,
-                    messageId
-                );
+
+                if (
+                    !isConversationMessage(
+                        message
+                    )
+                ) {
+                    markInboxMessageRead(
+                        game,
+                        messageId
+                    );
+                }
+
+
+                card
+                    .querySelectorAll(
+                        "[data-conversation-reply]"
+                    )
+                    .forEach(
+                        button => {
+                            button
+                                .addEventListener(
+                                    "click",
+                                    async () => {
+                                        try {
+                                            button.disabled =
+                                                true;
+
+                                            const result =
+                                                resolveConversationReply(
+                                                    game,
+                                                    messageId,
+                                                    button.dataset
+                                                        .conversationReply
+                                                );
+
+                                            saveGame(
+                                                game,
+                                                {
+                                                    reason:
+                                                        "conversation_reply"
+                                                }
+                                            );
+
+                                            await showConversationResult(
+                                                result
+                                            );
+
+                                            renderInboxView(
+                                                root
+                                            );
+                                        } catch (
+                                            error
+                                        ) {
+                                            console.error(
+                                                error
+                                            );
+
+                                            await showActionError(
+                                                error
+                                            );
+
+                                            button.disabled =
+                                                false;
+                                        }
+                                    }
+                                );
+                        }
+                    );
 
 
                 card
